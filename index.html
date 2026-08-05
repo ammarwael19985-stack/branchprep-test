@@ -277,8 +277,17 @@ function logout() {
   }
 }
 
+// دالة التركيز المعدلة لتتجنب سحب التركيز لو الموظف واقف يكتب أرقام يدوياً
 function safeFocus() {
+  var activeEl = document.activeElement;
+  if (activeEl && activeEl.classList && activeEl.classList.contains('actual-input')) {
+    return; // لا تسحب التركيز إطلاقاً
+  }
   setTimeout(function() {
+    var currentActive = document.activeElement;
+    if (currentActive && currentActive.classList && currentActive.classList.contains('actual-input')) {
+      return;
+    }
     barcodeInput.setAttribute('inputmode', 'none');
     try { barcodeInput.focus({ preventScroll: true }); } catch (e) { barcodeInput.focus(); }
   }, 100);
