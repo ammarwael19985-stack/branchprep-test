@@ -149,16 +149,15 @@ var branchNames = [];
 var historyListArr = [];
 var currentCode = null;
 var activeBranch = null;
+var isEditingManualInput = false; // متغيّر القديم المظبوط
 var sessionId = Math.random().toString(36).substring(2, 9);
 
 socket.on('init-data', function(data) {
   allOrdersStore = data || {};
-  if (orderCode) {
-    if (allOrdersStore[orderCode]) {
-      itemsData = allOrdersStore[orderCode].items || {};
-      if (currentCode && itemsData[currentCode]) {
-        renderResult(currentCode, itemsData[currentCode], activeBranch);
-      }
+  if (orderCode && allOrdersStore[orderCode]) {
+    itemsData = allOrdersStore[orderCode].items || {};
+    if (currentCode && itemsData[currentCode] && !isEditingManualInput) {
+      renderResult(currentCode, itemsData[currentCode], activeBranch);
     }
   }
 });
@@ -167,7 +166,7 @@ socket.on('data-changed', function(data) {
   allOrdersStore = data || {};
   if (orderCode && allOrdersStore[orderCode]) {
     itemsData = allOrdersStore[orderCode].items || {};
-    if (currentCode && itemsData[currentCode]) {
+    if (currentCode && itemsData[currentCode] && !isEditingManualInput) {
       renderResult(currentCode, itemsData[currentCode], activeBranch);
     }
   }
@@ -176,7 +175,7 @@ socket.on('data-changed', function(data) {
 socket.on('lock-changed', function(data) {
   if (data.orderCode === orderCode && itemsData[data.barcode]) {
     itemsData[data.barcode].lock = data.lock;
-    if (currentCode === data.barcode) {
+    if (currentCode === data.barcode && !isEditingManualInput) {
       renderResult(currentCode, itemsData[currentCode], activeBranch);
     }
   }
@@ -226,7 +225,6 @@ function loginToOrder() {
     return;
   }
 
-  // التحقق الحقيقي من وجود الطلبية على سيرفر Render
   if (!allOrdersStore[oCode]) {
     errDiv.style.display = 'block';
     errDiv.textContent = 'كود الطلبية غير صحيح أو غير موجود على السيرفر!';
@@ -286,17 +284,10 @@ function logout() {
   }
 }
 
-// دالة Focus المحسنة لمنع إغلاق الكيبورد أثناء كتابة الأرقام
+// دالة safeFocus بالظبط من الكود القديم
 function safeFocus() {
-  var activeEl = document.activeElement;
-  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-    return;
-  }
+  if (isEditingManualInput) return;
   setTimeout(function() {
-    var currentActive = document.activeElement;
-    if (currentActive && (currentActive.tagName === 'INPUT' || currentActive.tagName === 'TEXTAREA')) {
-      return;
-    }
     barcodeInput.setAttribute('inputmode', 'none');
     try { barcodeInput.focus({ preventScroll: true }); } catch (e) { barcodeInput.focus(); }
   }, 100);
@@ -478,8 +469,28 @@ function updateBranchActual(code, branch, val) {
 
 var resBox = document.getElementById('resultBox');
 
-// استبدال حدث input بـ change لتجنب إغلاق الكيبورد
-resBox.addEventListener('change', function(e) {
+// إضافة منطق focusin / focusout بتاع الكود القديم بالحرف
+resBox.addEventListener('focusin', function(e) {
+  var input = e.target.closest('.actual-input');
+  if (input) {
+    isEditingManualInput = true;
+  }
+});
+
+resBox.addEventListener('focusout', function(e) {
+  var input = e.target.closest('.actual-input');
+  if (input) {
+    setTimeout(function() {
+      var currentActive = document.activeElement;
+      if (!currentActive || !currentActive.classList.contains('actual-input')) {
+        isEditingManualInput = false;
+        safeFocus();
+      }
+    }, 200);
+  }
+});
+
+resBox.addEventListener('input', function(e) {
   var input = e.target.closest('.actual-input');
   if (input && currentCode) {
     var branch = input.getAttribute('data-branch');
