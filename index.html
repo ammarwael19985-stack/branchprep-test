@@ -4,35 +4,74 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BranchPrep - تحضير الفروع بالباركود</title>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
   :root {
-    --ink:#12181f; --paper:#f5f3ee; --panel:#ffffff; --line:#dcd6c9;
-    --accent:#1f6f5c; --accent-dark:#154d40; --warn:#b3452b; --muted:#6b6459;
+    --ink:#12181f;
+    --paper:#f5f3ee;
+    --panel:#ffffff;
+    --line:#dcd6c9;
+    --accent:#1f6f5c;
+    --accent-dark:#154d40;
+    --warn:#b3452b;
+    --muted:#6b6459;
   }
   * { box-sizing:border-box; }
-  body { margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:'Tahoma','Segoe UI',sans-serif; min-height:100vh; }
+  body {
+    margin:0; padding:0;
+    background:var(--paper); color:var(--ink);
+    font-family:'Tahoma','Segoe UI',sans-serif;
+    min-height:100vh;
+  }
   .wrap { max-width:720px; margin:0 auto; padding:20px 16px 60px; }
-  header { display:flex; align-items:center; justify-content:space-between; padding:14px 4px 20px; border-bottom:2px solid var(--ink); margin-bottom:22px; }
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 4px 20px; border-bottom:2px solid var(--ink); margin-bottom:22px;
+  }
   header h1 { font-size:1.15rem; margin:0; font-weight:800; }
   header .tag { font-size:.7rem; color:var(--muted); border:1px solid var(--line); padding:3px 8px; border-radius:20px; }
   
-  .login-card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:34px 22px; text-align:center; }
-  .login-card input { width:100%; padding:14px; margin-bottom:12px; border-radius:10px; border:1px solid var(--line); font-size:1.1rem; text-align:center; font-weight:bold; }
+  .login-card {
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:34px 22px; text-align:center;
+  }
+  .login-card input {
+    width:100%; padding:14px; margin-bottom:12px; border-radius:10px;
+    border:1px solid var(--line); font-size:1.1rem; text-align:center; font-weight:bold;
+  }
   .login-card input:focus { outline:2px solid var(--accent); }
 
-  .file-btn { display:inline-block; background:var(--accent); color:#fff; padding:13px 28px; border-radius:10px; font-weight:700; font-size:.95rem; cursor:pointer; border:none; width:100%; }
+  .file-btn {
+    display:inline-block; background:var(--accent); color:#fff;
+    padding:13px 28px; border-radius:10px; font-weight:700;
+    font-size:.95rem; cursor:pointer; border:none; width:100%;
+  }
   .file-btn:active { background:var(--accent-dark); }
 
-  .status-bar { display:flex; justify-content:space-between; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:16px; font-size:.78rem; color:var(--muted); }
+  .status-bar {
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:10px 14px; margin-bottom:16px;
+    font-size:.78rem; color:var(--muted);
+  }
   .status-bar b { color:var(--ink); }
-  .status-bar button { background:none; border:1px solid var(--line); border-radius:8px; padding:6px 12px; font-size:.75rem; color:var(--warn); cursor:pointer; }
+  .status-bar button {
+    background:none; border:1px solid var(--line); border-radius:8px;
+    padding:6px 12px; font-size:.75rem; color:var(--warn); cursor:pointer;
+  }
 
-  .worker-warning { background:#fbeae5; border:2px solid var(--warn); color:var(--warn); padding:12px 14px; border-radius:10px; font-weight:bold; font-size:0.95rem; margin-bottom:14px; text-align:center; display:none; box-shadow: 0 4px 10px rgba(179,69,43,0.15); }
+  .worker-warning {
+    background:#fbeae5; border:2px solid var(--warn); color:var(--warn);
+    padding:12px 14px; border-radius:10px; font-weight:bold; font-size:0.95rem;
+    margin-bottom:14px; text-align:center; display:none;
+    box-shadow: 0 4px 10px rgba(179,69,43,0.15);
+  }
 
   .scan-box { background:var(--ink); border-radius:14px; padding:20px; margin-bottom:18px; }
   .scan-box label { color:#c9c2b3; font-size:.8rem; display:block; margin-bottom:8px; }
-  .scan-box input { width:100%; padding:16px 14px; font-size:1.3rem; border-radius:10px; border:none; text-align:center; letter-spacing:1px; font-weight:700; }
+  .scan-box input {
+    width:100%; padding:16px 14px; font-size:1.3rem; border-radius:10px;
+    border:none; text-align:center; letter-spacing:1px; font-weight:700;
+  }
   .scan-box input:focus { outline:3px solid var(--accent); }
   
   .result { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:16px; }
@@ -48,7 +87,11 @@
   .total-row td.qty { color:var(--ink); font-size:1.3rem; }
   
   .branch-table td.check { width:38px; text-align:center; padding:0 2px; }
-  .fill-btn { background:#faf8f2; border:1px solid var(--line); border-radius:8px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:1rem; color:var(--accent-dark); transition:all 0.15s ease; }
+  .fill-btn {
+    background:#faf8f2; border:1px solid var(--line); border-radius:8px;
+    width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:1rem; color:var(--accent-dark); transition:all 0.15s ease;
+  }
   .fill-btn:active { background:var(--accent); color:#fff; border-color:var(--accent); transform:scale(0.92); }
   .fill-btn:disabled { opacity:0.2; cursor:not-allowed; pointer-events:none; }
   tr.branch-done td { color:#9a9488; }
@@ -59,12 +102,18 @@
   .branch-table tr.selected { background:#eef3ee; }
   .progress-note { font-size:.78rem; color:var(--muted); margin-bottom:14px; }
   .branch-table td.actual { width:78px; padding:6px 4px; }
-  .actual-input { width:100%; padding:8px 4px; border:1px solid var(--line); border-radius:8px; text-align:center; font-size:1rem; font-weight:700; color:var(--ink); background:#faf8f2; }
+  .actual-input {
+    width:100%; padding:8px 4px; border:1px solid var(--line); border-radius:8px;
+    text-align:center; font-size:1rem; font-weight:700; color:var(--ink); background:#faf8f2;
+  }
   .actual-input:focus { outline:2px solid var(--accent); border-color:var(--accent); background:#ffffff; }
   .actual-input:disabled { background:#e2ded8 !important; color:#999 !important; cursor:not-allowed; border-color:#ccc; }
 
   .branch-table td.zero-note { color:#b7b1a3; font-size:.8rem; text-align:center; }
-  .not-found { background:#fbeae5; border:1px solid #e3b6a6; color:var(--warn); border-radius:14px; padding:24px; text-align:center; font-size:1rem; font-weight:700; }
+  .not-found {
+    background:#fbeae5; border:1px solid #e3b6a6; color:var(--warn);
+    border-radius:14px; padding:24px; text-align:center; font-size:1rem; font-weight:700;
+  }
   .not-found .code { display:block; margin-top:6px; font-weight:400; font-size:.85rem; direction:ltr; }
   .placeholder { text-align:center; color:var(--muted); padding:40px 10px; font-size:.9rem; }
   .history { margin-top:22px; }
@@ -114,7 +163,9 @@
   <div id="scanScreen" style="display:none;">
     <div class="status-bar">
       <span>الموظف: <b id="workerLabel">-</b> | الطلبية: <b id="codeLabel">-</b></span>
-      <div><button id="logoutBtn" onclick="logout()">🚪 خروج</button></div>
+      <div>
+        <button id="logoutBtn" onclick="logout()">🚪 خروج</button>
+      </div>
     </div>
 
     <div class="scan-box">
@@ -138,10 +189,7 @@
 </div>
 
 <script>
-var SOCKET_SERVER = "https://branchprep-test.onrender.com";
-var socket = io(SOCKET_SERVER);
-
-var allOrdersStore = {};
+var DB_URL = "https://branchprep-default-rtdb.firebaseio.com";
 var workerName = "";
 var orderCode = "";
 var itemsData = {};
@@ -149,52 +197,13 @@ var branchNames = [];
 var historyListArr = [];
 var currentCode = null;
 var activeBranch = null;
+var pollInterval = null;
+
+var isEditingManualInput = false;
+var localModifiedBranches = {};
+
+var lastKnownUpdatedTime = null;
 var sessionId = Math.random().toString(36).substring(2, 9);
-
-socket.on('init-data', function(data) {
-  allOrdersStore = data || {};
-  if (orderCode && allOrdersStore[orderCode]) {
-    itemsData = allOrdersStore[orderCode].items || {};
-    if (currentCode && itemsData[currentCode]) {
-      renderResult(currentCode, itemsData[currentCode], activeBranch);
-    }
-  }
-});
-
-socket.on('data-changed', function(data) {
-  allOrdersStore = data || {};
-  if (orderCode && allOrdersStore[orderCode]) {
-    itemsData = allOrdersStore[orderCode].items || {};
-    if (currentCode && itemsData[currentCode]) {
-      renderResult(currentCode, itemsData[currentCode], activeBranch);
-    }
-  }
-});
-
-socket.on('lock-changed', function(data) {
-  if (data.orderCode === orderCode && itemsData[data.barcode]) {
-    itemsData[data.barcode].lock = data.lock;
-    if (currentCode === data.barcode) {
-      renderResult(currentCode, itemsData[currentCode], activeBranch);
-    }
-  }
-});
-
-socket.on('item-updated', function(data) {
-  if (data.orderCode === orderCode && itemsData[data.barcode]) {
-    if (!itemsData[data.barcode].branches) itemsData[data.barcode].branches = {};
-    if (!itemsData[data.barcode].branches[data.branch]) {
-      itemsData[data.barcode].branches[data.branch] = { target:0, actual:"", worker:"" };
-    }
-    
-    itemsData[data.barcode].branches[data.branch].actual = data.actual;
-    itemsData[data.barcode].branches[data.branch].worker = data.worker;
-
-    if (currentCode === data.barcode) {
-      updateDOMRow(data.branch, data.actual, data.worker);
-    }
-  }
-});
 
 try {
   workerName = localStorage.getItem('bp_worker') || "";
@@ -202,14 +211,16 @@ try {
 } catch(e){}
 
 var barcodeInput = document.getElementById('barcodeInput');
-barcodeInput.addEventListener('click', function() { this.removeAttribute('inputmode'); });
+barcodeInput.addEventListener('click', function() {
+  this.removeAttribute('inputmode');
+});
 
 window.onload = function() {
   try {
     if (workerName && orderCode) {
       document.getElementById('workerNameInput').value = workerName;
       document.getElementById('orderCodeInput').value = orderCode;
-      openScanScreen();
+      verifyAndLogin(workerName, orderCode, true);
     }
   } catch(e) {}
 };
@@ -225,15 +236,41 @@ function loginToOrder() {
     return;
   }
   errDiv.style.display = 'none';
-  workerName = wName;
-  orderCode = oCode;
+  verifyAndLogin(wName, oCode, false);
+}
 
-  try {
-    localStorage.setItem('bp_worker', workerName);
-    localStorage.setItem('bp_code', orderCode);
-  } catch(e){}
+function verifyAndLogin(wName, oCode, isAutoLogin) {
+  var errDiv = document.getElementById('loginError');
+  if (errDiv) errDiv.style.display = 'none';
 
-  openScanScreen();
+  fetch(DB_URL + '/orders/' + oCode + '.json')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data && data.items) {
+        workerName = wName;
+        orderCode = oCode;
+
+        try {
+          localStorage.setItem('bp_worker', workerName);
+          localStorage.setItem('bp_code', orderCode);
+        } catch(e){}
+
+        openScanScreen();
+        processFetchedData(data);
+      } else {
+        if (errDiv) {
+          errDiv.style.display = 'block';
+          errDiv.textContent = 'كود الطلبية غير صحيح أو لا توجد بيانات لها على السيرفر';
+        }
+        if (isAutoLogin) logoutSilently();
+      }
+    })
+    .catch(function(err) {
+      if (errDiv) {
+        errDiv.style.display = 'block';
+        errDiv.textContent = 'تعذر الاتصال بقاعدة البيانات. تحقق من الإنترنت.';
+      }
+    });
 }
 
 function openScanScreen() {
@@ -242,43 +279,149 @@ function openScanScreen() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('scanScreen').style.display = 'block';
   document.getElementById('statusTag').textContent = 'جاهز للمسح';
-  
-  if (allOrdersStore[orderCode]) {
-    itemsData = allOrdersStore[orderCode].items || {};
-  }
-  
-  sendHeartbeat();
-  setInterval(sendHeartbeat, 5000);
-
-  setInterval(function() {
-    if (currentCode) {
-      socket.emit('keep-lock-alive', { orderCode: orderCode, barcode: currentCode, sessionId: sessionId });
-    }
-  }, 3000);
-
   safeFocus();
+
+  if (!pollInterval) {
+    pollInterval = setInterval(function() {
+      smartFetchCheck();
+      sendSessionHeartbeat();
+      if(currentCode) {
+        keepLockAlive(currentCode);
+        checkCurrentItemLock(currentCode);
+      }
+    }, 2000);
+  }
 }
 
-function sendHeartbeat() {
+function sendSessionHeartbeat() {
   if (!workerName || !orderCode) return;
-  socket.emit('worker-heartbeat', { orderCode: orderCode, workerName: workerName });
+  var cleanKey = workerName.replace(/[.#$\[\]]/g, "_");
+  fetch(DB_URL + '/orders/' + orderCode + '/activeSessions/' + cleanKey + '.json', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: workerName, timestamp: Date.now() })
+  }).catch(function(e){});
+}
+
+function smartFetchCheck() {
+  if (!orderCode) return;
+  fetch(DB_URL + '/orders/' + orderCode + '/_lastUpdated.json')
+    .then(function(res) { return res.json(); })
+    .then(function(serverTime) {
+      if (serverTime && serverTime !== lastKnownUpdatedTime) {
+        lastKnownUpdatedTime = serverTime;
+        fetchLatestData(false);
+      }
+    })
+    .catch(function(e) {});
+}
+
+function checkCurrentItemLock(code) {
+  if (!orderCode || !code) return;
+  fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock.json')
+    .then(function(res) { return res.json(); })
+    .then(function(lockData) {
+      if (itemsData[code]) {
+        itemsData[code].lock = lockData;
+        if (!isEditingManualInput) {
+          renderResult(code, itemsData[code], activeBranch);
+        }
+      }
+    })
+    .catch(function(e) {});
+}
+
+function fetchLatestData(force) {
+  if (!orderCode) return;
+
+  fetch(DB_URL + '/orders/' + orderCode + '.json')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data && data.items) {
+        processFetchedData(data);
+      }
+    })
+    .catch(function(err) {});
+}
+
+function processFetchedData(data) {
+  if (data._lastUpdated) {
+    lastKnownUpdatedTime = data._lastUpdated;
+  }
+
+  Object.keys(data.items).forEach(function(codeKey) {
+    if (!itemsData[codeKey]) {
+      itemsData[codeKey] = data.items[codeKey];
+    } else {
+      itemsData[codeKey].product = data.items[codeKey].product;
+      itemsData[codeKey].lock = data.items[codeKey].lock;
+      
+      var sBranches = data.items[codeKey].branches || {};
+      if (!itemsData[codeKey].branches) itemsData[codeKey].branches = {};
+
+      Object.keys(sBranches).forEach(function(bName) {
+        var modKey = codeKey + "_" + bName;
+        if (!itemsData[codeKey].branches[bName]) {
+          itemsData[codeKey].branches[bName] = sBranches[bName];
+        } else {
+          itemsData[codeKey].branches[bName].target = sBranches[bName].target;
+          if (!localModifiedBranches[modKey]) {
+            itemsData[codeKey].branches[bName].actual = sBranches[bName].actual;
+            itemsData[codeKey].branches[bName].worker = sBranches[bName].worker;
+          }
+        }
+      });
+    }
+  });
+
+  var branchesSet = {};
+  Object.keys(itemsData).forEach(function(k) {
+    var item = itemsData[k];
+    if (item && item.branches) {
+      Object.keys(item.branches).forEach(function(b) { branchesSet[b] = true; });
+    }
+  });
+  branchNames = Object.keys(branchesSet);
+  document.getElementById('statusTag').textContent = 'جاهز للمسح';
+  
+  if (currentCode && itemsData[currentCode] && !isEditingManualInput) {
+    renderResult(currentCode, itemsData[currentCode], activeBranch);
+  }
+}
+
+function updateServerLastUpdated() {
+  if (!orderCode) return;
+  fetch(DB_URL + '/orders/' + orderCode + '/_lastUpdated.json', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Date.now())
+  }).catch(function(e){});
+}
+
+function logoutSilently() {
+  if (pollInterval) clearInterval(pollInterval);
+  try {
+    localStorage.removeItem('bp_worker');
+    localStorage.removeItem('bp_code');
+  } catch(e){}
+  document.getElementById('loginScreen').style.display = 'block';
+  document.getElementById('scanScreen').style.display = 'none';
 }
 
 function logout() {
-  if (confirm("هل أنت متأكد من تسجيل الخروج؟")) {
-    if (currentCode) {
-      socket.emit('release-lock', { orderCode: orderCode, barcode: currentCode, sessionId: sessionId });
+  var confirmExit = confirm("هل أنت متأكد من تسجيل الخروج؟");
+  if (confirmExit) {
+    if (pollInterval) clearInterval(pollInterval);
+    if (workerName && orderCode) {
+      var cleanKey = workerName.replace(/[.#$\[\]]/g, "_");
+      fetch(DB_URL + '/orders/' + orderCode + '/activeSessions/' + cleanKey + '.json', { method: 'DELETE' }).catch(function(e){});
+      if (currentCode) unlockCode(currentCode);
     }
-    try {
-      localStorage.removeItem('bp_worker');
-      localStorage.removeItem('bp_code');
-    } catch(e){}
+    logoutSilently();
     location.reload();
   }
 }
 
-// دالة التركيز المعدلة لتتجنب سحب التركيز لو الموظف واقف يكتب أرقام يدوياً
-// دالة التركيز المعدلة لمنع سحب التركيز أثناء الكتابة في أي حقل
 function safeFocus() {
   var activeEl = document.activeElement;
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
@@ -293,16 +436,12 @@ function safeFocus() {
     try { barcodeInput.focus({ preventScroll: true }); } catch (e) { barcodeInput.focus(); }
   }, 100);
 }
+
 document.getElementById('scanForm').addEventListener('submit', function(e) {
   e.preventDefault();
   var code = barcodeInput.value.trim();
   if (!code) return;
 
-  if (allOrdersStore[orderCode]) {
-    itemsData = allOrdersStore[orderCode].items || {};
-  }
-
-  // الضغط المتكرر لنفس الباركود لزيادة العدد بمقدار 1
   if (code === currentCode && itemsData[code]) {
     var lockWorker = getActiveLockWorker(itemsData[code]);
     if (!lockWorker && activeBranch) {
@@ -313,37 +452,23 @@ document.getElementById('scanForm').addEventListener('submit', function(e) {
     safeFocus();
     return;
   }
+  document.getElementById('placeholder').style.display = 'none';
 
   if (itemsData[code]) {
     if (currentCode && currentCode !== code) {
-      socket.emit('release-lock', { orderCode: orderCode, barcode: currentCode, sessionId: sessionId });
+      unlockCode(currentCode);
     }
 
-    document.getElementById('placeholder').style.display = 'none';
     document.getElementById('notFoundBox').style.display = 'none';
     document.getElementById('resultBox').style.display = 'block';
     activeBranch = null;
     
-    var branchesSet = {};
-    Object.keys(itemsData).forEach(function(k) {
-      if (itemsData[k] && itemsData[k].branches) {
-        Object.keys(itemsData[k].branches).forEach(function(b) { branchesSet[b] = true; });
-      }
-    });
-    branchNames = Object.keys(branchesSet);
-
-    currentCode = code;
-    socket.emit('acquire-lock', { orderCode: orderCode, barcode: code, workerName: workerName, sessionId: sessionId });
-
-    renderResult(code, itemsData[code], activeBranch);
+    tryAcquireLock(code);
 
     historyListArr.unshift({ name: itemsData[code].product || code, code: code });
     historyListArr = historyListArr.slice(0, 8);
     renderHistory();
   } else {
-    if (currentCode) {
-      socket.emit('release-lock', { orderCode: orderCode, barcode: currentCode, sessionId: sessionId });
-    }
     currentCode = null;
     activeBranch = null;
     document.getElementById('resultBox').style.display = 'none';
@@ -365,9 +490,66 @@ function getActiveLockWorker(row) {
   return null;
 }
 
+function tryAcquireLock(code) {
+  if (!workerName || !code) return;
+
+  fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock.json')
+    .then(function(res) { return res.json(); })
+    .then(function(serverLock) {
+      var now = Date.now();
+      if (serverLock && serverLock.sessionId && serverLock.sessionId !== sessionId && (now - (serverLock.timestamp || 0) < 15000)) {
+        if (!itemsData[code]) itemsData[code] = {};
+        itemsData[code].lock = serverLock;
+        renderResult(code, itemsData[code], activeBranch);
+      } else {
+        var lockData = { worker: workerName, sessionId: sessionId, timestamp: now };
+        if (!itemsData[code]) itemsData[code] = {};
+        itemsData[code].lock = lockData;
+
+        fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock.json', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(lockData)
+        }).catch(function(e){});
+
+        renderResult(code, itemsData[code], activeBranch);
+      }
+    })
+    .catch(function(e){
+      renderResult(code, itemsData[code], activeBranch);
+    });
+}
+
+function keepLockAlive(code) {
+  if (!workerName || !code) return;
+  var item = itemsData[code];
+  if (item && item.lock && item.lock.sessionId === sessionId) {
+    item.lock.timestamp = Date.now();
+    fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock/timestamp.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Date.now())
+    }).catch(function(e){});
+  }
+}
+
+function unlockCode(code) {
+  if (!workerName || !code) return;
+  var item = itemsData[code];
+  if (item && item.lock && item.lock.sessionId === sessionId) {
+    delete item.lock;
+    fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock.json', {
+      method: 'DELETE'
+    }).catch(function(e){});
+  }
+}
+
 function renderResult(code, row, focusBranch) {
   currentCode = code;
-  var total = 0, doneCount = 0, neededCount = 0, rowsHtml = '';
+  var total = 0;
+  var doneCount = 0;
+  var neededCount = 0;
+  var rowsHtml = '';
   if (focusBranch !== undefined) activeBranch = focusBranch;
 
   var lockWorker = getActiveLockWorker(row);
@@ -389,13 +571,17 @@ function renderResult(code, row, focusBranch) {
     
     total += qtyNum;
     var isZero = qtyNum === 0;
-    var actionCell = '', doneClass = '', selectedClass = '';
+
+    var actionCell;
+    var doneClass = '';
+    var selectedClass = '';
 
     if (isZero) {
       actionCell = '<td class="zero-note">لا يحتاج</td><td></td>';
     } else {
       neededCount++;
-      if (actualVal !== '' && actualNum >= qtyNum) { doneCount++; doneClass = ' branch-done'; }
+      var isComplete = actualVal !== '' && actualNum >= qtyNum;
+      if (isComplete) { doneCount++; doneClass = ' branch-done'; }
       if (bName === activeBranch) selectedClass = ' selected';
 
       var disabledAttr = isReadOnly ? 'disabled="disabled"' : '';
@@ -405,12 +591,14 @@ function renderResult(code, row, focusBranch) {
         '<td class="check"><button type="button" class="fill-btn" data-branch="' + escapeHtml(bName) + '" ' + disabledAttr + '>⚡</button></td>';
     }
 
-    var workerText = bData.worker ? ' <small class="w-name" style="color:#217346; font-weight:bold;">(' + escapeHtml(bData.worker) + ')</small>' : '<small class="w-name"></small>';
+    var zeroClass = isZero ? ' zero' : '';
+    var workerText = bData.worker ? ' <small style="color:#217346; font-weight:bold;">(' + escapeHtml(bData.worker) + ')</small>' : '';
     
-    rowsHtml += '<tr id="branch_row_' + escapeHtml(bName) + '" class="' + (isZero ? ' zero' : '') + doneClass + selectedClass + '" data-branch="' + escapeHtml(bName) + '">' +
-      '<td>' + escapeHtml(bName) + workerText + '</td>' +
+    rowsHtml += '<tr id="branch_row_' + escapeHtml(bName) + '" class="' + (zeroClass + doneClass + selectedClass).trim() + '" data-branch="' + escapeHtml(bName) + '">' +
+      '<td>' + escapeHtml(bName) + '<span class="w-label">' + workerText + '</span></td>' +
       '<td class="qty">' + qtyNum + '</td>' +
-      actionCell + '</tr>';
+      actionCell +
+      '</tr>';
   });
 
   rowsHtml += '<tr class="total-row"><td>الإجمالي</td><td class="qty">' + total + '</td><td></td><td></td></tr>';
@@ -418,37 +606,19 @@ function renderResult(code, row, focusBranch) {
   document.getElementById('resultBox').innerHTML =
     '<div class="pname">' + escapeHtml(row.product || code) + '</div>' +
     (row.product ? '<div class="pbarcode">' + escapeHtml(code) + '</div>' : '') +
-    '<div class="progress-note">اتحضر ' + doneCount + ' من ' + neededCount + ' فرع — اختر فرع لمسحه أو (⚡) للملء.</div>' +
+    '<div class="progress-note">اتحضر <span id="doneCountText">' + doneCount + '</span> من ' + neededCount + ' فرع محتاج تحضير — دوس على الفرع واضغط الباركود لتسجيله، أو (⚡) للملء.</div>' +
     '<table class="branch-table"><tbody>' + rowsHtml + '</tbody></table>';
 }
 
-function updateDOMRow(branch, val, wName) {
-  var rowEl = document.getElementById('branch_row_' + branch);
-  if (!rowEl) return;
-
-  var input = rowEl.querySelector('.actual-input');
-  if (input && document.activeElement !== input) {
-    input.value = val;
-  }
-
-  var targetQty = (itemsData[currentCode] && itemsData[currentCode].branches[branch]) ? Number(itemsData[currentCode].branches[branch].target) : 0;
-  var numVal = Number(val) || 0;
-
-  if (val !== '' && numVal >= targetQty) {
-    rowEl.classList.add('branch-done');
-  } else {
-    rowEl.classList.remove('branch-done');
-  }
-
-  var wSpan = rowEl.querySelector('.w-name');
-  if (wSpan) {
-    wSpan.innerHTML = wName ? ' (' + escapeHtml(wName) + ')' : '';
-  }
-}
-
-function updateBranchActual(code, branch, val) {
-  if (!itemsData[code] || getActiveLockWorker(itemsData[code])) return;
+function updateBranchActual(code, branch, val, skipRender) {
+  if (!code || !branch) return;
+  if (!itemsData[code]) return;
   
+  if (getActiveLockWorker(itemsData[code])) return;
+
+  var modKey = code + "_" + branch;
+  localModifiedBranches[modKey] = true;
+
   if (!itemsData[code].branches) itemsData[code].branches = {};
   if (!itemsData[code].branches[branch]) {
     itemsData[code].branches[branch] = { target:0, actual:"", worker:"" };
@@ -457,24 +627,65 @@ function updateBranchActual(code, branch, val) {
   itemsData[code].branches[branch].actual = val;
   itemsData[code].branches[branch].worker = workerName;
 
-  updateDOMRow(branch, val, workerName);
+  if (!skipRender) {
+    renderResult(code, itemsData[code], branch);
+  } else {
+    var rowEl = document.getElementById('branch_row_' + branch);
+    if (rowEl) {
+      var targetQty = Number(itemsData[code].branches[branch].target) || 0;
+      var numVal = Number(val) || 0;
+      if (val !== '' && numVal >= targetQty) {
+        rowEl.classList.add('branch-done');
+      } else {
+        rowEl.classList.remove('branch-done');
+      }
+      var wLabel = rowEl.querySelector('.w-label');
+      if (wLabel) {
+        wLabel.innerHTML = workerName ? ' <small style="color:#217346; font-weight:bold;">(' + escapeHtml(workerName) + ')</small>' : '';
+      }
+    }
+  }
 
-  socket.emit('update-item', {
-    orderCode: orderCode,
-    barcode: code,
-    branch: branch,
-    actual: val,
-    worker: workerName
-  });
+  fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/branches/' + branch + '.json', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actual: val, worker: workerName })
+  }).then(function() {
+    updateServerLastUpdated();
+    setTimeout(function() { delete localModifiedBranches[modKey]; }, 3000);
+  }).catch(function(e){});
 }
 
 var resBox = document.getElementById('resultBox');
 
+resBox.addEventListener('focusin', function(e) {
+  var input = e.target.closest('.actual-input');
+  if (input) {
+    isEditingManualInput = true;
+  }
+});
+
+resBox.addEventListener('focusout', function(e) {
+  var input = e.target.closest('.actual-input');
+  if (input) {
+    setTimeout(function() {
+      var currentActive = document.activeElement;
+      if (!currentActive || !currentActive.classList.contains('actual-input')) {
+        isEditingManualInput = false;
+        safeFocus();
+      }
+    }, 200);
+  }
+});
+
+// تم تحويل الحدث إلى change لمنع إعادة رسم العناصر وإغلاق الكيبورد أثناء كتابة الرقم
 resBox.addEventListener('change', function(e) {
   var input = e.target.closest('.actual-input');
   if (input && currentCode) {
     var branch = input.getAttribute('data-branch');
-    if (branch) updateBranchActual(currentCode, branch, input.value);
+    if (branch) {
+      updateBranchActual(currentCode, branch, input.value, true);
+    }
   }
 });
 
@@ -485,8 +696,9 @@ resBox.addEventListener('click', function(e) {
   if (btn && currentCode) {
     e.stopPropagation();
     var branch = btn.getAttribute('data-branch');
-    if (branch && itemsData[currentCode] && itemsData[currentCode].branches[branch]) {
-      updateBranchActual(currentCode, branch, itemsData[currentCode].branches[branch].target);
+    if (branch) {
+      var targetQty = (itemsData[currentCode] && itemsData[currentCode].branches && itemsData[currentCode].branches[branch]) ? itemsData[currentCode].branches[branch].target : 0;
+      updateBranchActual(currentCode, branch, targetQty);
       safeFocus();
     }
     return;
@@ -507,10 +719,13 @@ resBox.addEventListener('click', function(e) {
 function renderHistory() {
   var hBox = document.getElementById('historyBox');
   var hList = document.getElementById('historyList');
-  if (historyListArr.length === 0) return hBox.style.display = 'none';
+  if (historyListArr.length === 0) {
+    hBox.style.display = 'none';
+    return;
+  }
   hBox.style.display = 'block';
   hList.innerHTML = historyListArr.map(function(h) {
-    return '<div class="history-item"><span>' + escapeHtml(h.name) + '</span><span class="code">' + escapeHtml(h.code) + '</span></div>';
+    return '<div class="history-item"><span class="name">' + escapeHtml(h.name) + '</span><span class="code">' + escapeHtml(h.code) + '</span></div>';
   }).join('');
 }
 
