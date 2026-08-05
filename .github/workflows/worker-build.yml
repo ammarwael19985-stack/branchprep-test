@@ -11,8 +11,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Setup Java JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -20,15 +25,25 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build APK with Cordova/Capacitor or Bubblewrap
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Build Android APK
         run: |
-          # هنا خطوة البناء الخاصة بك أو نسخ ملفات التطبيق
-          mkdir -p output
-          # افتراضياً للتأكد من إن المسار موجود
-          echo "Building APK..."
+          mkdir -p apk_output
+          # توليد تطبيق الأندرويد من موقع GitHub Pages
+          npx @bubblewrap/cli init --manifest="https://ammarwael19985-stack.github.io/branchprep-test/manifest.json" --directory=android_project || true
+          
+          if [ -d "android_project" ]; then
+            cd android_project
+            npx @bubblewrap/cli build
+            cp app-release-signed.apk ../apk_output/BranchPrep-Worker.apk || cp *.apk ../apk_output/BranchPrep-Worker.apk || true
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BranchPrep-Worker-APK
-          path: '**/*.apk'
+          path: |
+            **/*.apk
+            apk_output/*.apk
