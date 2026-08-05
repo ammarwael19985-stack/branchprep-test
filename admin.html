@@ -186,7 +186,6 @@ socket.on('data-changed', (data) => {
   }
 });
 
-// استقبال التحديث الجزئي السريع للأصناف بدون بطء
 socket.on('item-updated', ({ orderCode, barcode, branch, actual, worker }) => {
   if (currentActiveCode === orderCode && allOrdersStore[orderCode]) {
     const item = allOrdersStore[orderCode].items[barcode];
@@ -198,7 +197,6 @@ socket.on('item-updated', ({ orderCode, barcode, branch, actual, worker }) => {
   }
 });
 
-// استقبال تحديث المتواجدين فقط لخفة الأداء
 socket.on('sessions-updated', ({ orderCode, activeSessions }) => {
   if (currentActiveCode === orderCode && allOrdersStore[orderCode]) {
     allOrdersStore[orderCode].activeSessions = activeSessions;
@@ -512,6 +510,7 @@ function exportToExcel(onlyPending) {
       : `تقرير_طلبية_${currentActiveCode}.xlsx`;
 
     XLSX.writeFile(workbook, fileName);
+    showDownloadToast(fileName);
 
   } catch(err) {
     alert("حدث خطأ أثناء إعداد التقرير، أعد المحاولة!");
@@ -519,6 +518,37 @@ function exportToExcel(onlyPending) {
 
   btn.textContent = originalText;
   btn.disabled = false;
+}
+
+function showDownloadToast(fileName) {
+  const existingToast = document.getElementById('excelDownloadToast');
+  if (existingToast) existingToast.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'excelDownloadToast';
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background-color: #1f6f5c;
+    color: white;
+    padding: 14px 20px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: inherit;
+  `;
+
+  toast.innerHTML = `
+    <span style="font-size:1.1rem;">📊 تم تصدير الملف بنجاح!</span>
+    <span style="font-size:0.88rem; background:rgba(255,255,255,0.2); padding:4px 8px; border-radius:4px;">تجد الملف الآن في مجلد التحميلات (Downloads)</span>
+  `;
+
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast) toast.remove(); }, 6000);
 }
 
 function resetCurrentOrder() {
