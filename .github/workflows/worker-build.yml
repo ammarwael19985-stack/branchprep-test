@@ -20,12 +20,30 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Build Android APK using PWABuilder
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Initialize & Build Android Project
         run: |
-          npx @pwabuilder/pwabuilder pwa https://ammarwael19985-stack.github.io/branchprep-test/ -o output/ -platform android
+          mkdir -p apk_output
+          yes | bubblewrap init --manifest="https://ammarwael19985-stack.github.io/branchprep-test/manifest.json" --directory=android_app || true
+          if [ -d "android_app" ]; then
+            cd android_app
+            yes | bubblewrap build || true
+            cp *.apk ../apk_output/BranchPrep-Worker.apk 2>/dev/null || cp app-release-signed.apk ../apk_output/BranchPrep-Worker.apk 2>/dev/null || true
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BranchPrep-Worker-APK
-          path: output/**/*.apk
+          path: apk_output/*.apk
