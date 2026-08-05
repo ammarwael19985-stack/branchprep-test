@@ -18,40 +18,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android Licenses
-        run: y | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
-      - name: Install Cordova
-        run: npm install -g cordova
-
-      - name: Create Cordova Project & Add Android
+      - name: Build Android APK using PWABuilder
         run: |
-          cordova create myApp com.branchprep.worker BranchPrepWorker
-          cd myApp
-          rm -rf www/*
-          cp -r ../index.html www/
-          cp -r ../manifest.json www/ 2>/dev/null || true
-          cp -r ../*.png www/ 2>/dev/null || true
-          cordova platform add android@12.0.0
-
-      - name: Build Android APK
-        run: |
-          cd myApp
-          cordova build android --debug
+          npx @pwabuilder/pwabuilder pwa https://ammarwael19985-stack.github.io/branchprep-test/ -o output/ -platform android
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BranchPrep-Worker-APK
-          path: myApp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          path: output/**/*.apk
