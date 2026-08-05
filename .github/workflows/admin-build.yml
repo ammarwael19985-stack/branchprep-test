@@ -17,14 +17,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
-      - name: Build Executable
+      - name: Install Nativefier
+        run: npm install -g nativefier
+
+      - name: Build Windows Executable
         run: |
-          echo "Building Admin Executable..."
+          nativefier --name "BranchPrep-Admin" "https://ammarwael19985-stack.github.io/branchprep-test/admin.html" --out build/
 
-      - name: Upload Artifact
+      - name: Upload Windows App Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BranchPrep-Admin-Setup
-          path: output/*
+          name: BranchPrep-Admin-Windows
+          path: build/*
