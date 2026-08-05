@@ -14,10 +14,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 18
 
       - name: Setup Java JDK
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -25,25 +25,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
+      - name: Install PWABuilder CLI
+        run: npm install -g @pwabuilder/cli
 
-      - name: Build Android APK
+      - name: Build APK File
         run: |
           mkdir -p apk_output
-          # توليد تطبيق الأندرويد من موقع GitHub Pages
-          npx @bubblewrap/cli init --manifest="https://ammarwael19985-stack.github.io/branchprep-test/manifest.json" --directory=android_project || true
-          
-          if [ -d "android_project" ]; then
-            cd android_project
-            npx @bubblewrap/cli build
-            cp app-release-signed.apk ../apk_output/BranchPrep-Worker.apk || cp *.apk ../apk_output/BranchPrep-Worker.apk || true
-          fi
+          pwa2apk -u "https://ammarwael19985-stack.github.io/branchprep-test/" -o apk_output || true
+          find . -name "*.apk" -exec cp {} apk_output/ \; || true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BranchPrep-Worker-APK
-          path: |
-            **/*.apk
-            apk_output/*.apk
+          path: apk_output/*.apk
