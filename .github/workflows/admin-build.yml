@@ -19,17 +19,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Tools
-        run: |
-          npm install -g nativefier png-to-ico-cli
-
-      - name: Convert PNG Icon to ICO
-        run: |
-          npx png-to-ico admin-icon-512.png > admin-icon.ico
+      - name: Install Nativefier
+        run: npm install -g nativefier
 
       - name: Build Windows Executable
         run: |
-          nativefier --name "BranchPrep-Admin" --icon "admin-icon.ico" "https://ammarwael19985-stack.github.io/branchprep-test/admin.html" build-out/
+          nativefier --name "BranchPrep-Admin" --icon "admin-icon-512.ico" "https://ammarwael19985-stack.github.io/branchprep-test/admin.html" build-out/
 
       - name: Upload Windows App Artifact
         uses: actions/upload-artifact@v4
