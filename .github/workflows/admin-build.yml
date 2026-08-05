@@ -19,8 +19,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Nativefier
-        run: npm install -g nativefier
+      - name: Install Tools
+        run: |
+          npm install -g nativefier png-to-ico-cli
+
+      - name: Convert PNG Icon to ICO
+        run: |
+          npx png-to-ico admin-icon-512.png > admin-icon.ico
 
       - name: Build Windows Executable
         run: |
