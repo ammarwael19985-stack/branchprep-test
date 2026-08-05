@@ -365,20 +365,21 @@ function updateDashboardUI(orderData) {
     totalItemsCount++;
     const item = items[barcode];
     let branchDetailsHtml = '';
-    let isItemComplete = true;
-    let isBeingPrepared = false;
+    
+    let itemHasAnyActual = false; 
+    let isItemFullyDone = true;   
 
     Object.keys(item.branches || {}).forEach(bName => {
       const bData = item.branches[bName];
       const target = Number(bData.target) || 0;
-      const actual = bData.actual !== "" ? Number(bData.actual) : 0;
+      const actual = (bData.actual !== "" && bData.actual !== undefined) ? Number(bData.actual) : 0;
       const worker = bData.worker ? `(${bData.worker})` : '';
 
       totalTargetQty += target;
       totalActualQty += actual;
 
-      if (actual < target) isItemComplete = false;
-      if (bData.actual !== "") isBeingPrepared = true;
+      if (bData.actual !== "") itemHasAnyActual = true;
+      if (actual < target) isItemFullyDone = false;
 
       const isDone = actual >= target && target > 0;
       branchDetailsHtml += `
@@ -388,16 +389,16 @@ function updateDashboardUI(orderData) {
       `;
     });
 
-    if (isBeingPrepared) {
+    if (itemHasAnyActual) {
       startedItemsCount++;
-      if (isItemComplete) {
+      if (isItemFullyDone) {
         completedItemsCount++;
       } else {
         pendingItemsCount++;
       }
     }
 
-    if (!isBeingPrepared && !(item.lock && Date.now() - item.lock.timestamp < 10000)) return;
+    if (!itemHasAnyActual && !(item.lock && Date.now() - item.lock.timestamp < 10000)) return;
 
     hasVisibleItems = true;
     const tr = document.createElement('tr');
@@ -406,8 +407,8 @@ function updateDashboardUI(orderData) {
       <td style="font-weight:bold;">${item.product || '-'}</td>
       <td>${branchDetailsHtml}</td>
       <td>
-        <span class="badge ${isItemComplete ? 'badge-done' : 'badge-pending'}">
-          ${isItemComplete ? 'مكتمل' : 'قيد التحضير'}
+        <span class="badge ${isItemFullyDone ? 'badge-done' : 'badge-pending'}">
+          ${isItemFullyDone ? 'مكتمل' : 'قيد التحضير'}
         </span>
       </td>
     `;
@@ -426,8 +427,8 @@ function updateDashboardUI(orderData) {
   document.getElementById('completedItemsText').textContent = `${completedItemsCount} / ${totalItemsCount} صنف (${completedPercent}%)`;
   document.getElementById('completedItemsBar').style.width = `${completedPercent}%`;
 
-  const pendingPercent = startedItemsCount > 0 ? Math.round((pendingItemsCount / startedItemsCount) * 100) : 0;
-  document.getElementById('pendingItemsText').textContent = `${pendingPercent} صنف`;
+  document.getElementById('pendingItemsText').textContent = `${pendingItemsCount} صنف`;
+  const pendingPercent = totalItemsCount > 0 ? Math.round((pendingItemsCount / totalItemsCount) * 100) : 0;
   document.getElementById('pendingItemsBar').style.width = `${pendingPercent}%`;
 
   const totalQtyPercent = totalTargetQty > 0 ? Math.min(100, Math.round((totalActualQty / totalTargetQty) * 100)) : 0;
