@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BranchPrep - تحضير الفروع بالباركود (Ultra Fast)</title>
+<title>BranchPrep - تحضير الفروع بالباركود</title>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
   :root {
@@ -149,6 +149,7 @@ var branchNames = [];
 var historyListArr = [];
 var currentCode = null;
 var activeBranch = null;
+var sessionId = Math.random().toString(36).substring(2, 9);
 
 socket.on('init-data', function(data) {
   allOrdersStore = data || {};
@@ -170,7 +171,15 @@ socket.on('data-changed', function(data) {
   }
 });
 
-// استقبال التحديث الجزئي السريع
+socket.on('lock-changed', function(data) {
+  if (data.orderCode === orderCode && itemsData[data.barcode]) {
+    itemsData[data.barcode].lock = data.lock;
+    if (currentCode === data.barcode) {
+      renderResult(currentCode, itemsData[currentCode], activeBranch);
+    }
+  }
+});
+
 socket.on('item-updated', function(data) {
   if (data.orderCode === orderCode && itemsData[data.barcode]) {
     if (!itemsData[data.barcode].branches) itemsData[data.barcode].branches = {};
@@ -181,7 +190,6 @@ socket.on('item-updated', function(data) {
     itemsData[data.barcode].branches[data.branch].actual = data.actual;
     itemsData[data.barcode].branches[data.branch].worker = data.worker;
 
-    // لو التعديل على الصنف اللي مفتوح قدام الموظف حالياً
     if (currentCode === data.barcode) {
       updateDOMRow(data.branch, data.actual, data.worker);
     }
@@ -241,6 +249,13 @@ function openScanScreen() {
   
   sendHeartbeat();
   setInterval(sendHeartbeat, 5000);
+
+  setInterval(function() {
+    if (currentCode) {
+      socket.emit('keep-lock-alive', { orderCode: orderCode, barcode: currentCode, sessionId: sessionId });
+    }
+  }, 3000);
+
   safeFocus();
 }
 
@@ -251,6 +266,9 @@ function sendHeartbeat() {
 
 function logout() {
   if (confirm("هل أنت متأكد من تسجيل الخروج؟")) {
+    if (currentCode) {
+      socket.emit('release-lock', { orderCode: orderCode, barcode: currentCode, sessionId: sessionId });
+    }
     try {
       localStorage.removeItem('bp_worker');
       localStorage.removeItem('bp_code');
@@ -275,10 +293,27 @@ document.getElementById('scanForm').addEventListener('submit', function(e) {
     itemsData = allOrdersStore[orderCode].items || {};
   }
 
+  // الضغط المتكرر لنفس الباركود لزيادة العدد بمقدار 1
+  if (code === currentCode && itemsData[code]) {
+    var lockWorker = getActiveLockWorker(itemsData[code]);
+    if (!lockWorker && activeBranch) {
+      var currentVal = Number(itemsData[code].branches && itemsData[code].branches[activeBranch] ? itemsData[code].branches[activeBranch].actual : 0) || 0;
+      updateBranchActual(code, activeBranch, currentVal + 1);
+    }
+    barcodeInput.value = '';
+    safeFocus();
+    return;
+  }
+
   if (itemsData[code]) {
+    if (currentCode && currentCode !== code) {
+      socket.emit('release-lock', { orderCode: orderCode, barcode: currentCode, sessionId: sessionId });
+    }
+
     document.getElementById('placeholder').style.display = 'none';
     document.getElementById('notFoundBox').style.display = 'none';
     document.getElementById('resultBox').style.display = 'block';
+    activeBranch = null;
     
     var branchesSet = {};
     Object.keys(itemsData).forEach(function(k) {
@@ -289,26 +324,53 @@ document.getElementById('scanForm').addEventListener('submit', function(e) {
     branchNames = Object.keys(branchesSet);
 
     currentCode = code;
+    socket.emit('acquire-lock', { orderCode: orderCode, barcode: code, workerName: workerName, sessionId: sessionId });
+
     renderResult(code, itemsData[code], activeBranch);
 
     historyListArr.unshift({ name: itemsData[code].product || code, code: code });
     historyListArr = historyListArr.slice(0, 8);
     renderHistory();
   } else {
+    if (currentCode) {
+      socket.emit('release-lock', { orderCode: orderCode, barcode: currentCode, sessionId: sessionId });
+    }
     currentCode = null;
+    activeBranch = null;
     document.getElementById('resultBox').style.display = 'none';
     document.getElementById('notFoundBox').style.display = 'block';
-    document.getElementById('notFoundBox').innerHTML = 'الباركود غير موجود في الطلبية <span class="code">' + escapeHtml(code) + '</span>';
+    document.getElementById('workerWarning').style.display = 'none';
+    document.getElementById('notFoundBox').innerHTML = 'الباركود ده مش موجود في الطلبية <span class="code">' + escapeHtml(code) + '</span>';
   }
 
   barcodeInput.value = '';
   safeFocus();
 });
 
+function getActiveLockWorker(row) {
+  if (row && row.lock && row.lock.sessionId && row.lock.sessionId !== sessionId) {
+    if (Date.now() - (row.lock.timestamp || 0) < 15000) {
+      return row.lock.worker || "موظف آخر";
+    }
+  }
+  return null;
+}
+
 function renderResult(code, row, focusBranch) {
   currentCode = code;
   var total = 0, doneCount = 0, neededCount = 0, rowsHtml = '';
   if (focusBranch !== undefined) activeBranch = focusBranch;
+
+  var lockWorker = getActiveLockWorker(row);
+  var isReadOnly = !!lockWorker;
+
+  var warnBox = document.getElementById('workerWarning');
+  if (isReadOnly) {
+    warnBox.style.display = 'block';
+    warnBox.innerHTML = '🔒 <b>تنبيه:</b> الموظف (<b>' + escapeHtml(lockWorker) + '</b>) متواجد شغال على هذا المنتج حالياً!<br><small style="font-weight:normal;">التعديل مقفول عليك حالياً ومتاح فقط للموظف (<b>' + escapeHtml(lockWorker) + '</b>).</small>';
+  } else {
+    warnBox.style.display = 'none';
+  }
 
   branchNames.forEach(function(bName) {
     var bData = (row.branches && row.branches[bName]) ? row.branches[bName] : { target:0, actual:"", worker:"" };
@@ -327,9 +389,11 @@ function renderResult(code, row, focusBranch) {
       if (actualVal !== '' && actualNum >= qtyNum) { doneCount++; doneClass = ' branch-done'; }
       if (bName === activeBranch) selectedClass = ' selected';
 
+      var disabledAttr = isReadOnly ? 'disabled="disabled"' : '';
+
       actionCell =
-        '<td class="actual"><input type="number" inputmode="numeric" class="actual-input" data-branch="' + escapeHtml(bName) + '" placeholder="0" value="' + escapeHtml(String(actualVal)) + '" onclick="event.stopPropagation();" /></td>' +
-        '<td class="check"><button type="button" class="fill-btn" data-branch="' + escapeHtml(bName) + '">⚡</button></td>';
+        '<td class="actual"><input type="number" inputmode="numeric" class="actual-input" data-branch="' + escapeHtml(bName) + '" placeholder="0" value="' + escapeHtml(String(actualVal)) + '" ' + disabledAttr + ' onclick="event.stopPropagation();" /></td>' +
+        '<td class="check"><button type="button" class="fill-btn" data-branch="' + escapeHtml(bName) + '" ' + disabledAttr + '>⚡</button></td>';
     }
 
     var workerText = bData.worker ? ' <small class="w-name" style="color:#217346; font-weight:bold;">(' + escapeHtml(bData.worker) + ')</small>' : '<small class="w-name"></small>';
@@ -344,11 +408,11 @@ function renderResult(code, row, focusBranch) {
 
   document.getElementById('resultBox').innerHTML =
     '<div class="pname">' + escapeHtml(row.product || code) + '</div>' +
+    (row.product ? '<div class="pbarcode">' + escapeHtml(code) + '</div>' : '') +
     '<div class="progress-note">اتحضر ' + doneCount + ' من ' + neededCount + ' فرع — اختر فرع لمسحه أو (⚡) للملء.</div>' +
     '<table class="branch-table"><tbody>' + rowsHtml + '</tbody></table>';
 }
 
-// تحديث الخانة مباشرة دون مسح الصفحة لمنع تهنيج الكيبورد والزر
 function updateDOMRow(branch, val, wName) {
   var rowEl = document.getElementById('branch_row_' + branch);
   if (!rowEl) return;
@@ -374,7 +438,7 @@ function updateDOMRow(branch, val, wName) {
 }
 
 function updateBranchActual(code, branch, val) {
-  if (!itemsData[code]) return;
+  if (!itemsData[code] || getActiveLockWorker(itemsData[code])) return;
   
   if (!itemsData[code].branches) itemsData[code].branches = {};
   if (!itemsData[code].branches[branch]) {
@@ -386,7 +450,6 @@ function updateBranchActual(code, branch, val) {
 
   updateDOMRow(branch, val, workerName);
 
-  // إرسال التحديث الجزئي السريع للسيرفر
   socket.emit('update-item', {
     orderCode: orderCode,
     barcode: code,
@@ -407,6 +470,8 @@ resBox.addEventListener('input', function(e) {
 });
 
 resBox.addEventListener('click', function(e) {
+  if (itemsData[currentCode] && getActiveLockWorker(itemsData[currentCode])) return;
+
   var btn = e.target.closest('.fill-btn');
   if (btn && currentCode) {
     e.stopPropagation();
@@ -420,6 +485,7 @@ resBox.addEventListener('click', function(e) {
 
   var tr = e.target.closest('tr[data-branch]');
   if (tr && currentCode) {
+    if (tr.classList.contains('zero') || e.target.classList.contains('actual-input')) return;
     var bName = tr.getAttribute('data-branch');
     if (bName) {
       activeBranch = bName;
