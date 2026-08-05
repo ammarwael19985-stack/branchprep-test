@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BranchPrep - لوحة إدارة المستودع (Render Server)</title>
+<title>BranchPrep - لوحة إدارة المستودع (Render Fast Server)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
@@ -186,6 +186,26 @@ socket.on('data-changed', (data) => {
   }
 });
 
+// استقبال التحديث الجزئي السريع للأصناف بدون بطء
+socket.on('item-updated', ({ orderCode, barcode, branch, actual, worker }) => {
+  if (currentActiveCode === orderCode && allOrdersStore[orderCode]) {
+    const item = allOrdersStore[orderCode].items[barcode];
+    if (item && item.branches && item.branches[branch]) {
+      item.branches[branch].actual = actual;
+      item.branches[branch].worker = worker;
+      updateDashboardUI(allOrdersStore[orderCode]);
+    }
+  }
+});
+
+// استقبال تحديث المتواجدين فقط لخفة الأداء
+socket.on('sessions-updated', ({ orderCode, activeSessions }) => {
+  if (currentActiveCode === orderCode && allOrdersStore[orderCode]) {
+    allOrdersStore[orderCode].activeSessions = activeSessions;
+    renderWorkersOnly(activeSessions);
+  }
+});
+
 window.addEventListener('DOMContentLoaded', () => {
   if (currentActiveCode) showDashboard(currentActiveCode);
 });
@@ -291,6 +311,26 @@ function processExcelData(rows) {
   showDashboard(orderCode);
 }
 
+function renderWorkersOnly(sessions) {
+  const activeWorkersMap = {};
+  Object.keys(sessions || {}).forEach(sKey => {
+    const sess = sessions[sKey];
+    if (sess && sess.name && sess.timestamp) {
+      if (Date.now() - sess.timestamp < 10000) {
+        activeWorkersMap[sess.name] = true;
+      }
+    }
+  });
+
+  const workersArr = Object.keys(activeWorkersMap);
+  const workersContainer = document.getElementById('workersListContainer');
+  if (workersArr.length > 0) {
+    workersContainer.innerHTML = workersArr.map(w => `<span class="worker-badge">${w}</span>`).join('');
+  } else {
+    workersContainer.innerHTML = `<span style="color:#888; font-size:0.85rem;">لا يوجد موظفين متواجدين حالياً</span>`;
+  }
+}
+
 function updateDashboardUI(orderData) {
   if (!orderData) return;
   const items = orderData.items || {};
@@ -309,16 +349,7 @@ function updateDashboardUI(orderData) {
   let totalActualQty = 0;
   let hasVisibleItems = false;
 
-  const activeWorkersMap = {};
-
-  Object.keys(sessions).forEach(sKey => {
-    const sess = sessions[sKey];
-    if (sess && sess.name && sess.timestamp) {
-      if (Date.now() - sess.timestamp < 10000) {
-        activeWorkersMap[sess.name] = true;
-      }
-    }
-  });
+  renderWorkersOnly(sessions);
 
   Object.keys(items).forEach(barcode => {
     totalItemsCount++;
@@ -326,12 +357,6 @@ function updateDashboardUI(orderData) {
     let branchDetailsHtml = '';
     let isItemComplete = true;
     let isBeingPrepared = false;
-
-    if (item.lock && item.lock.worker && item.lock.timestamp) {
-      if (Date.now() - item.lock.timestamp < 10000) {
-        activeWorkersMap[item.lock.worker] = true;
-      }
-    }
 
     Object.keys(item.branches || {}).forEach(bName => {
       const bData = item.branches[bName];
@@ -379,14 +404,6 @@ function updateDashboardUI(orderData) {
     tbody.appendChild(tr);
   });
 
-  const workersArr = Object.keys(activeWorkersMap);
-  const workersContainer = document.getElementById('workersListContainer');
-  if (workersArr.length > 0) {
-    workersContainer.innerHTML = workersArr.map(w => `<span class="worker-badge">${w}</span>`).join('');
-  } else {
-    workersContainer.innerHTML = `<span style="color:#888; font-size:0.85rem;">لا يوجد موظفين متواجدين حالياً</span>`;
-  }
-
   if (!hasVisibleItems) {
     tbody.innerHTML = '<tr><td colspan="4" class="empty-state">لم يتم بدء التحضير في أي صنف بعد.<br>بمجرد أن يقوم العامل بمسح صنف، سيظهر هنا فوراً.</td></tr>';
   }
@@ -400,7 +417,7 @@ function updateDashboardUI(orderData) {
   document.getElementById('completedItemsBar').style.width = `${completedPercent}%`;
 
   const pendingPercent = startedItemsCount > 0 ? Math.round((pendingItemsCount / startedItemsCount) * 100) : 0;
-  document.getElementById('pendingItemsText').textContent = `${pendingItemsCount} صنف`;
+  document.getElementById('pendingItemsText').textContent = `${pendingPercent} صنف`;
   document.getElementById('pendingItemsBar').style.width = `${pendingPercent}%`;
 
   const totalQtyPercent = totalTargetQty > 0 ? Math.min(100, Math.round((totalActualQty / totalTargetQty) * 100)) : 0;
