@@ -149,7 +149,7 @@ var branchNames = [];
 var historyListArr = [];
 var currentCode = null;
 var activeBranch = null;
-var isEditingManualInput = false; // متغيّر القديم المظبوط
+var isEditingManualInput = false;
 var sessionId = Math.random().toString(36).substring(2, 9);
 
 socket.on('init-data', function(data) {
@@ -205,11 +205,13 @@ try {
 var barcodeInput = document.getElementById('barcodeInput');
 barcodeInput.addEventListener('click', function() { this.removeAttribute('inputmode'); });
 
+// تعديل الدخول التلقائي للشاشة فور الفتح
 window.onload = function() {
   try {
     if (workerName && orderCode) {
       document.getElementById('workerNameInput').value = workerName;
       document.getElementById('orderCodeInput').value = orderCode;
+      openScanScreen();
     }
   } catch(e) {}
 };
@@ -222,12 +224,6 @@ function loginToOrder() {
   if (!wName || !oCode) {
     errDiv.style.display = 'block';
     errDiv.textContent = 'برجاء كتابة الاسم وكود الطلبية أولاً';
-    return;
-  }
-
-  if (!allOrdersStore[oCode]) {
-    errDiv.style.display = 'block';
-    errDiv.textContent = 'كود الطلبية غير صحيح أو غير موجود على السيرفر!';
     return;
   }
 
@@ -284,7 +280,6 @@ function logout() {
   }
 }
 
-// دالة safeFocus بالظبط من الكود القديم
 function safeFocus() {
   if (isEditingManualInput) return;
   setTimeout(function() {
@@ -469,7 +464,6 @@ function updateBranchActual(code, branch, val) {
 
 var resBox = document.getElementById('resultBox');
 
-// إضافة منطق focusin / focusout بتاع الكود القديم بالحرف
 resBox.addEventListener('focusin', function(e) {
   var input = e.target.closest('.actual-input');
   if (input) {
