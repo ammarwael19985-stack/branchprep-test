@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BranchPrep - لوحة إدارة المستودع</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root { --primary: #1f6f5c; --bg: #f4f6f8; --card: #ffffff; --text: #12181f; --success: #28a745; --muted: #6b6459; --line: #e2e8f0; --warning: #d97706; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  .card { background: var(--card); padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin-bottom: 20px; }
+  h1 { margin-top: 0; color: var(--primary); text-align: center; }
+  .drop-zone { border: 2px dashed #b2c8c2; border-radius: 12px; padding: 30px; text-align: center; background: #fafcfb; cursor: pointer; transition: 0.2s; }
+  .drop-zone:hover { border-color: var(--primary); background: #f0f7f5; }
+  
+  .reopen-box { display: flex; gap: 10px; justify-content: center; align-items: center; margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--line); }
+  .reopen-box input { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); font-size: 1rem; width: 180px; text-align: center; font-weight: bold; }
+  .btn-secondary { background: #4a5568; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.95rem; }
+  .btn-secondary:hover { background: #2d3748; }
+
+  .code-banner { background: #eef7f4; border: 2px solid var(--primary); padding: 15px 25px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .code-num { font-size: 2.8rem; font-weight: 800; color: var(--primary); letter-spacing: 3px; }
+  
+  .workers-box {
+    background: #faf8f2; border: 1px solid #dcd6c9; border-radius: 12px;
+    padding: 12px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .worker-badge {
+    background: #e2f0d9; border: 1px solid #b5d5a7; color: #1e520f;
+    padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .worker-badge::before { content: '●'; color: #28a745; font-size: 0.8rem; }
+
+  .progress-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;
+  }
+  @media(max-width: 900px) { .progress-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media(max-width: 550px) { .progress-grid { grid-template-columns: 1fr; } }
+
+  .prog-card { background: #faf8f5; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; position: relative; }
+  .prog-card .p-title { font-size: 0.8rem; font-weight: bold; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+  .prog-card .p-num { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+  
+  .progress-bar-bg { background: var(--line); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 8px; }
+  .progress-bar-fill { background: var(--primary); height: 100%; width: 0%; transition: width 0.4s ease; }
+  .progress-bar-fill.warning { background: var(--warning); }
+  .progress-bar-fill.success { background: #16a34a; }
+  
+  .btn-export { background: #217346; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; white-space: nowrap; }
+  .btn-export:hover { background: #1e6b41; }
+  .btn-export-small { background: #d97706; color: white; border: none; padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: bold; cursor: pointer; float: left; }
+  .btn-export-small:hover { background: #b45309; }
+
+  .btn-reset { background: #dc3545; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  
+  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+  th, td { padding: 12px 15px; text-align: right; border-bottom: 1px solid var(--line); }
+  th { background: #f8fafc; color: var(--muted); font-size: 0.9rem; }
+  
+  .badge { padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; display: inline-block; }
+  .badge-done { background: #d4edda; color: #155724; }
+  .badge-pending { background: #fff3cd; color: #856404; }
+  .hidden { display: none !important; }
+  .empty-state { text-align: center; padding: 40px; color: #888; font-size: 1.1rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card" id="uploadCard">
+    <h1>BranchPrep Control 🖥️</h1>
+    <p style="text-align: center; color: var(--muted);">رفع طلبية جديدة أو فتح متابعة طلبية سابقة</p>
+    
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div style="font-size: 2.5rem; margin-bottom: 8px;">📁</div>
+      <h3 style="margin:5px 0;">اضغط هنا لااختيار ملف الإكسيل أو اسحبه إلى هنا</h3>
+      <p style="font-size: 0.85rem; color: #888; margin:0;">يدعم ملفات .xlsx و .xls</p>
+      <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none;" onchange="handleFile(this.files[0])">
+    </div>
+    
+    <div class="reopen-box">
+      <span style="font-size:0.9rem; font-weight:bold; color:var(--muted);">أو فتح طلبية سابقة بالكود:</span>
+      <input type="number" id="oldCodeInput" placeholder="مثال: 5397" />
+      <button class="btn-secondary" onclick="openExistingOrder()">فتح الطلبية 📂</button>
+    </div>
+
+    <div id="status" style="text-align:center; font-weight:bold; margin-top:10px; color:var(--primary);"></div>
+  </div>
+
+  <div id="liveDashboard" class="card hidden">
+    <div class="code-banner">
+      <div>
+        <div style="font-weight:bold; color:var(--muted);">كود التحضير النشط حالياً:</div>
+        <div style="font-size:0.85rem; color:#666;">الموظفين شغالين بهذا الكود على الجهاز</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:15px;">
+        <div class="code-num" id="orderCodeDisplay">0000</div>
+        <button class="btn-reset" onclick="resetCurrentOrder()">خروج من الطلبية 🚪</button>
+      </div>
+    </div>
+
+    <div class="workers-box">
+      <span style="font-weight:bold; font-size:0.9rem; color:var(--text);">👷 الموظفين النشطين حالياً:</span>
+      <div id="workersListContainer" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <span style="color:#888; font-size:0.85rem;">جاري التحقق ...</span>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h3 style="margin:0; font-size:1.05rem;">مؤشرات إنجاز الأصناف والقطع 📊</h3>
+      <button class="btn-export" id="exportBtn" onclick="exportToExcel(false)">
+        📊 تصدير كل النتائج للإكسيل
+      </button>
+    </div>
+
+    <div class="progress-grid">
+      <div class="prog-card">
+        <div class="p-title">
+          <span>📦 أصناف بدأ تحضيرها:</span>
+        </div>
+        <div class="p-num" id="startedItemsText">0 / 0 صنف</div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="startedItemsBar"></div>
+        </div>
+      </div>
+
+      <div class="prog-card">
+        <div class="p-title">
+          <span>✅ أصناف مكتملة 100%:</span>
+        </div>
+        <div class="p-num" style="color:#155724;" id="completedItemsText">0 / 0 صنف</div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill success" id="completedItemsBar"></div>
+        </div>
+      </div>
+
+      <div class="prog-card">
+        <div class="p-title">
+          <span>⏳ أصناف قيد التحضير:</span>
+          <button class="btn-export-small" onclick="exportToExcel(true)" title="تصدير الأصناف قيد التحضير فقط إلى إكسيل">📥 تصدير</button>
+        </div>
+        <div class="p-num" style="color:#856404;" id="pendingItemsText">0 صنف</div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill warning" id="pendingItemsBar"></div>
+        </div>
+      </div>
+
+      <div class="prog-card">
+        <div class="p-title">
+          <span>🧩 إجمالي القطع الكلية:</span>
+        </div>
+        <div class="p-num" id="totalQtyText">0% (0 / 0)</div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="totalQtyBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:20px; border-bottom:2px solid var(--primary); padding-bottom:8px;">الأصناف غير مكتملة التحضير ⏱️</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>الباركود</th>
+          <th>اسم المنتج</th>
+          <th>تفاصيل الفروع (المطلوب / المحضر)</th>
+          <th>الحالة</th>
+        </tr>
+      </thead>
+      <tbody id="itemsTableBody">
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const DB_URL = "https://branchprep-default-rtdb.firebaseio.com";
+let currentActiveCode = localStorage.getItem('bp_admin_code') || null;
+let currentItemsData = null;
+let monitorInterval = null;
+
+// متغيّرات الفحص الذكي لتوفير البيانات
+let lastKnownUpdatedTime = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (currentActiveCode) showDashboard(currentActiveCode);
+});
+
+function showDashboard(code) {
+  document.getElementById('uploadCard').classList.add('hidden');
+  document.getElementById('liveDashboard').classList.remove('hidden');
+  document.getElementById('orderCodeDisplay').textContent = code;
+  fetchOrderData(code);
+  startLiveMonitoring(code);
+}
+
+async function openExistingOrder() {
+  const code = document.getElementById('oldCodeInput').value.trim();
+  if(!code) return alert('برجاء كتابة كود الطلبية أولاً!');
+
+  document.getElementById('status').textContent = 'جاري البحث عن الطلبية...';
+  
+  try {
+    const res = await fetch(`${DB_URL}/orders/${code}.json`);
+    const data = await res.json();
+    
+    if(data && (data.items || data.activeSessions)) {
+      document.getElementById('status').textContent = '';
+      currentActiveCode = code;
+      localStorage.setItem('bp_admin_code', code);
+      showDashboard(code);
+    } else {
+      alert('لم يتم العثور على طلبية بهذا الكود! تأكد من الرقم.');
+      document.getElementById('status').textContent = '';
+    }
+  } catch(err) {
+    alert('تعذر الاتصال بالسيرفر!');
+    document.getElementById('status').textContent = '';
+  }
+}
+
+async function fetchOrderData(code) {
+  try {
+    const res = await fetch(`${DB_URL}/orders/${code}.json`);
+    const data = await res.json();
+    if (data) {
+      if (data._lastUpdated) {
+        lastKnownUpdatedTime = data._lastUpdated;
+      }
+      updateDashboardUI(data);
+      return data;
+    }
+  } catch(err) {
+    console.error("Error fetching order:", err);
+  }
+  return null;
+}
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#1f6f5c'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#b2c8c2'; });
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+  if (!file) return;
+  document.getElementById('status').textContent = 'جاري قراءة ملف الإكسيل...';
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      processExcelData(json);
+    } catch(err) {
+      alert('خطأ في قراءة الملف!');
+      document.getElementById('status').textContent = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function processExcelData(rows) {
+  if (rows.length < 2) return alert('الملف فارغ!');
+  document.getElementById('status').textContent = 'جاري معالجة البيانات واستخرج الفروع...';
+  
+  const header = rows[0];
+  const branchCols = [];
+  
+  for(let c = 2; c < header.length; c++) {
+    if(header[c] !== undefined && String(header[c]).trim() !== "") {
+      branchCols.push({ name: String(header[c]).trim(), index: c });
+    }
+  }
+
+  if(branchCols.length === 0) return alert('لم يتم العثور على فروع في الملف!');
+
+  const items = {};
+  
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const barcode = String(row[0] || '').trim();
+    const productName = String(row[1] || '').trim();
+    if (!barcode || barcode === 'undefined') continue;
+    
+    const branches = {};
+    branchCols.forEach(col => {
+      const qty = Number(row[col.index]) || 0;
+      if (qty > 0) branches[col.name] = { target: qty, actual: "", worker: "" };
+    });
+    
+    if (Object.keys(branches).length > 0) {
+      items[barcode] = { product: productName, branches: branches };
+    }
+  }
+
+  const orderCode = Math.floor(1000 + Math.random() * 9000).toString();
+  document.getElementById('status').textContent = `تم العثور على ${branchCols.length} فروع.. جاري الرفع!`;
+  
+  try {
+    const res = await fetch(`${DB_URL}/orders/${orderCode}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ createdAt: new Date().toISOString(), _lastUpdated: Date.now(), items: items })
+    });
+
+    if (res.ok) {
+      document.getElementById('status').textContent = '';
+      currentActiveCode = orderCode;
+      localStorage.setItem('bp_admin_code', orderCode);
+      showDashboard(orderCode);
+    }
+  } catch(err) {
+    alert('حدث خطأ في الاتصال بالسحابة!');
+  }
+}
+
+function startLiveMonitoring(orderCode) {
+  if(monitorInterval) clearInterval(monitorInterval);
+  // فحص خفيف جداً لتوفير استهلاك الترافيك 100%
+  monitorInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`${DB_URL}/orders/${orderCode}/_lastUpdated.json`);
+      const serverTime = await res.json();
+      if (serverTime && serverTime !== lastKnownUpdatedTime) {
+        lastKnownUpdatedTime = serverTime;
+        fetchOrderData(orderCode);
+      } else {
+        // فحص تواجد الموظفين فقط بخفة
+        const sRes = await fetch(`${DB_URL}/orders/${orderCode}/activeSessions.json`);
+        const sessions = await sRes.json();
+        if (sessions) updateActiveWorkersOnly(sessions);
+      }
+    } catch(err) {}
+  }, 2000);
+}
+
+function updateActiveWorkersOnly(sessions) {
+  const activeWorkersMap = {};
+  Object.keys(sessions || {}).forEach(sKey => {
+    const sess = sessions[sKey];
+    if (sess && sess.name && sess.timestamp) {
+      if (Date.now() - sess.timestamp < 6000) {
+        activeWorkersMap[sess.name] = true;
+      }
+    }
+  });
+
+  const workersArr = Object.keys(activeWorkersMap);
+  const workersContainer = document.getElementById('workersListContainer');
+  if (workersArr.length > 0) {
+    workersContainer.innerHTML = workersArr.map(w => `<span class="worker-badge">${w}</span>`).join('');
+  } else {
+    workersContainer.innerHTML = `<span style="color:#888; font-size:0.85rem;">لا يوجد موظفين متواجدين حالياً</span>`;
+  }
+}
+
+function updateDashboardUI(orderData) {
+  const items = orderData.items || {};
+  const sessions = orderData.activeSessions || {};
+  currentItemsData = items;
+
+  const tbody = document.getElementById('itemsTableBody');
+  tbody.innerHTML = '';
+
+  let totalItemsCount = 0;        
+  let startedItemsCount = 0;      
+  let completedItemsCount = 0;    
+  let pendingItemsCount = 0;      
+
+  let totalTargetQty = 0;
+  let totalActualQty = 0;
+  let hasVisibleItems = false;
+
+  const activeWorkersMap = {};
+
+  Object.keys(sessions).forEach(sKey => {
+    const sess = sessions[sKey];
+    if (sess && sess.name && sess.timestamp) {
+      if (Date.now() - sess.timestamp < 6000) {
+        activeWorkersMap[sess.name] = true;
+      }
+    }
+  });
+
+  Object.keys(items).forEach(barcode => {
+    totalItemsCount++;
+    const item = items[barcode];
+    let branchDetailsHtml = '';
+    let isItemComplete = true;
+    let isBeingPrepared = false;
+
+    if (item.lock && item.lock.worker && item.lock.timestamp) {
+      if (Date.now() - item.lock.timestamp < 6000) {
+        activeWorkersMap[item.lock.worker] = true;
+      }
+    }
+
+    Object.keys(item.branches || {}).forEach(bName => {
+      const bData = item.branches[bName];
+      const target = Number(bData.target) || 0;
+      const actual = bData.actual !== "" ? Number(bData.actual) : 0;
+      const worker = bData.worker ? `(${bData.worker})` : '';
+
+      totalTargetQty += target;
+      totalActualQty += actual;
+
+      if (actual < target) isItemComplete = false;
+      if (bData.actual !== "") isBeingPrepared = true;
+
+      const isDone = actual >= target && target > 0;
+      branchDetailsHtml += `
+        <span style="display:inline-block; margin-left:10px; margin-bottom:4px; padding:3px 8px; border-radius:6px; background:${isDone ? '#e6f4ea' : '#f1f3f4'}; color:${isDone ? '#137333' : '#3c4043'}; font-size:0.85rem;">
+          <b>${bName}:</b> ${actual}/${target} <small style="color:#666;">${worker}</small>
+        </span>
+      `;
+    });
+
+    if (isBeingPrepared) {
+      startedItemsCount++;
+      if (isItemComplete) {
+        completedItemsCount++;
+      } else {
+        pendingItemsCount++;
+      }
+    }
+
+    if (!isBeingPrepared && !(item.lock && Date.now() - item.lock.timestamp < 6000)) return;
+
+    hasVisibleItems = true;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-family:monospace; font-weight:bold;">${barcode}</td>
+      <td style="font-weight:bold;">${item.product || '-'}</td>
+      <td>${branchDetailsHtml}</td>
+      <td>
+        <span class="badge ${isItemComplete ? 'badge-done' : 'badge-pending'}">
+          ${isItemComplete ? 'مكتمل' : 'قيد التحضير'}
+        </span>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const workersArr = Object.keys(activeWorkersMap);
+  const workersContainer = document.getElementById('workersListContainer');
+  if (workersArr.length > 0) {
+    workersContainer.innerHTML = workersArr.map(w => `<span class="worker-badge">${w}</span>`).join('');
+  } else {
+    workersContainer.innerHTML = `<span style="color:#888; font-size:0.85rem;">لا يوجد موظفين متواجدين حالياً</span>`;
+  }
+
+  if (!hasVisibleItems) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">لم يتم بدء التحضير في أي صنف بعد.<br>بمجرد أن يقوم العامل بمسح صنف، سيظهر هنا فوراً.</td></tr>';
+  }
+
+  const startedPercent = totalItemsCount > 0 ? Math.round((startedItemsCount / totalItemsCount) * 100) : 0;
+  document.getElementById('startedItemsText').textContent = `${startedItemsCount} / ${totalItemsCount} صنف (${startedPercent}%)`;
+  document.getElementById('startedItemsBar').style.width = `${startedPercent}%`;
+
+  const completedPercent = totalItemsCount > 0 ? Math.round((completedItemsCount / totalItemsCount) * 100) : 0;
+  document.getElementById('completedItemsText').textContent = `${completedItemsCount} / ${totalItemsCount} صنف (${completedPercent}%)`;
+  document.getElementById('completedItemsBar').style.width = `${completedPercent}%`;
+
+  const pendingPercent = startedItemsCount > 0 ? Math.round((pendingItemsCount / startedItemsCount) * 100) : 0;
+  document.getElementById('pendingItemsText').textContent = `${pendingItemsCount} صنف`;
+  document.getElementById('pendingItemsBar').style.width = `${pendingPercent}%`;
+
+  const totalQtyPercent = totalTargetQty > 0 ? Math.min(100, Math.round((totalActualQty / totalTargetQty) * 100)) : 0;
+  document.getElementById('totalQtyText').textContent = `${totalQtyPercent}% (${totalActualQty} / ${totalTargetQty})`;
+  document.getElementById('totalQtyBar').style.width = `${totalQtyPercent}%`;
+}
+
+// تصدير الإكسيل بدون استهلاك شبكة زيادة
+async function exportToExcel(onlyPending) {
+  if (!currentActiveCode) return alert('لا توجد طلبية نشطة!');
+  
+  const btn = document.getElementById('exportBtn');
+  const originalText = btn.textContent;
+  btn.textContent = "⏳ جاري التصدير...";
+  btn.disabled = true;
+
+  try {
+    const freshData = await fetchOrderData(currentActiveCode);
+    const items = (freshData && freshData.items) ? freshData.items : currentItemsData;
+
+    if (!items) {
+      alert('لا توجد بيانات لتصديرها!');
+      btn.textContent = originalText;
+      btn.disabled = false;
+      return;
+    }
+
+    const excelRows = [];
+    const header = ['الباركود', 'اسم المنتج', 'الفرع', 'الكمية المطلوبة', 'الكمية المحضرة', 'حالة التحضير', 'المحضر'];
+    excelRows.push(header);
+
+    Object.keys(items).forEach(barcode => {
+      const item = items[barcode];
+      const branches = item.branches || {};
+
+      let isItemPending = false;
+      let hasAnyActual = false;
+
+      Object.keys(branches).forEach(bName => {
+        const bData = branches[bName];
+        const target = Number(bData.target) || 0;
+        const actual = (bData.actual !== "" && bData.actual !== undefined) ? Number(bData.actual) : 0;
+        if (bData.actual !== "") hasAnyActual = true;
+        if (actual < target) isItemPending = true;
+      });
+
+      if (onlyPending && (!hasAnyActual || !isItemPending)) {
+        return;
+      }
+
+      Object.keys(branches).forEach(bName => {
+        const bData = branches[bName];
+        const target = Number(bData.target) || 0;
+        const actual = (bData.actual !== "" && bData.actual !== undefined) ? Number(bData.actual) : 0;
+        const worker = bData.worker || '';
+
+        let statusText = "";
+        if (bData.actual === "" || actual === 0) {
+          statusText = "لم يتم التحضير";
+        } else if (actual > target) {
+          statusText = "أعلى من المطلوبة";
+        } else if (actual < target) {
+          statusText = "اقل من المطلوبة";
+        } else if (actual === target) {
+          statusText = "تم التحضير";
+        }
+
+        excelRows.push([
+          barcode,
+          item.product || '',
+          bName,
+          target,
+          actual,
+          statusText,
+          worker
+        ]);
+      });
+    });
+
+    if (excelRows.length <= 1) {
+      alert("لا توجد أصناف قيد التحضير حالياً للتصدير!");
+      btn.textContent = originalText;
+      btn.disabled = false;
+      return;
+    }
+
+    const worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+    const workbook = XLSX.utils.book_new();
+    const sheetName = onlyPending ? "أصناف قيد التحضير" : "تقرير التحضير الكلي";
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    
+    const fileName = onlyPending 
+      ? `اصناف_قيد_التحضير_طلبية_${currentActiveCode}.xlsx`
+      : `تقرير_طلبية_${currentActiveCode}.xlsx`;
+
+    XLSX.writeFile(workbook, fileName);
+    showDownloadToast(fileName);
+
+  } catch(err) {
+    alert("حدث خطأ أثناء إعداد التقرير، أعد المحاولة!");
+  }
+
+  btn.textContent = originalText;
+  btn.disabled = false;
+}
+
+function showDownloadToast(fileName) {
+  const existingToast = document.getElementById('excelDownloadToast');
+  if (existingToast) existingToast.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'excelDownloadToast';
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background-color: #1f6f5c;
+    color: white;
+    padding: 14px 20px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: inherit;
+  `;
+
+  toast.innerHTML = `
+    <span style="font-size:1.1rem;">📊 تم تصدير الملف بنجاح!</span>
+    <span style="font-size:0.88rem; background:rgba(255,255,255,0.2); padding:4px 8px; border-radius:4px;">تجد الملف الآن في مجلد التحميلات (Downloads)</span>
+  `;
+
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast) toast.remove(); }, 6000);
+}
+
+function resetCurrentOrder() {
+  if(confirm('هل تريد الخروج من شاشة متابعة هذه الطلبية؟ (يمكنك العودة إليها لاحقاً بكتابة الكود)')) {
+    if(monitorInterval) clearInterval(monitorInterval);
+    localStorage.removeItem('bp_admin_code');
+    location.reload();
+  }
+}
+</script>
+</body>
+</html>
