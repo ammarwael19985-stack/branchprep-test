@@ -470,7 +470,7 @@ function updateBranchActual(code, branch, val) {
 
 var resBox = document.getElementById('resultBox');
 
-resBox.addEventListener('input', function(e) {
+resBox.addEventListener('change', function(e) {
   var input = e.target.closest('.actual-input');
   if (input && currentCode) {
     var branch = input.getAttribute('data-branch');
