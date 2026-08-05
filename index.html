@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BranchPrep - تحضير الفروع بالباركود</title>
+<title>BranchPrep - تحضير الفروع بالباركود (Ultra Fast)</title>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
   :root {
@@ -170,6 +170,24 @@ socket.on('data-changed', function(data) {
   }
 });
 
+// استقبال التحديث الجزئي السريع
+socket.on('item-updated', function(data) {
+  if (data.orderCode === orderCode && itemsData[data.barcode]) {
+    if (!itemsData[data.barcode].branches) itemsData[data.barcode].branches = {};
+    if (!itemsData[data.barcode].branches[data.branch]) {
+      itemsData[data.barcode].branches[data.branch] = { target:0, actual:"", worker:"" };
+    }
+    
+    itemsData[data.barcode].branches[data.branch].actual = data.actual;
+    itemsData[data.barcode].branches[data.branch].worker = data.worker;
+
+    // لو التعديل على الصنف اللي مفتوح قدام الموظف حالياً
+    if (currentCode === data.barcode) {
+      updateDOMRow(data.branch, data.actual, data.worker);
+    }
+  }
+});
+
 try {
   workerName = localStorage.getItem('bp_worker') || "";
   orderCode = localStorage.getItem('bp_code') || "";
@@ -222,17 +240,13 @@ function openScanScreen() {
   }
   
   sendHeartbeat();
-  setInterval(sendHeartbeat, 4000);
+  setInterval(sendHeartbeat, 5000);
   safeFocus();
 }
 
 function sendHeartbeat() {
-  if (!workerName || !orderCode || !allOrdersStore[orderCode]) return;
-  if (!allOrdersStore[orderCode].activeSessions) allOrdersStore[orderCode].activeSessions = {};
-  
-  var cleanKey = workerName.replace(/[.#$\[\]]/g, "_");
-  allOrdersStore[orderCode].activeSessions[cleanKey] = { name: workerName, timestamp: Date.now() };
-  socket.emit('update-data', allOrdersStore);
+  if (!workerName || !orderCode) return;
+  socket.emit('worker-heartbeat', { orderCode: orderCode, workerName: workerName });
 }
 
 function logout() {
@@ -318,7 +332,7 @@ function renderResult(code, row, focusBranch) {
         '<td class="check"><button type="button" class="fill-btn" data-branch="' + escapeHtml(bName) + '">⚡</button></td>';
     }
 
-    var workerText = bData.worker ? ' <small style="color:#217346; font-weight:bold;">(' + escapeHtml(bData.worker) + ')</small>' : '';
+    var workerText = bData.worker ? ' <small class="w-name" style="color:#217346; font-weight:bold;">(' + escapeHtml(bData.worker) + ')</small>' : '<small class="w-name"></small>';
     
     rowsHtml += '<tr id="branch_row_' + escapeHtml(bName) + '" class="' + (isZero ? ' zero' : '') + doneClass + selectedClass + '" data-branch="' + escapeHtml(bName) + '">' +
       '<td>' + escapeHtml(bName) + workerText + '</td>' +
@@ -334,17 +348,52 @@ function renderResult(code, row, focusBranch) {
     '<table class="branch-table"><tbody>' + rowsHtml + '</tbody></table>';
 }
 
+// تحديث الخانة مباشرة دون مسح الصفحة لمنع تهنيج الكيبورد والزر
+function updateDOMRow(branch, val, wName) {
+  var rowEl = document.getElementById('branch_row_' + branch);
+  if (!rowEl) return;
+
+  var input = rowEl.querySelector('.actual-input');
+  if (input && document.activeElement !== input) {
+    input.value = val;
+  }
+
+  var targetQty = (itemsData[currentCode] && itemsData[currentCode].branches[branch]) ? Number(itemsData[currentCode].branches[branch].target) : 0;
+  var numVal = Number(val) || 0;
+
+  if (val !== '' && numVal >= targetQty) {
+    rowEl.classList.add('branch-done');
+  } else {
+    rowEl.classList.remove('branch-done');
+  }
+
+  var wSpan = rowEl.querySelector('.w-name');
+  if (wSpan) {
+    wSpan.innerHTML = wName ? ' (' + escapeHtml(wName) + ')' : '';
+  }
+}
+
 function updateBranchActual(code, branch, val) {
-  if (!allOrdersStore[orderCode] || !allOrdersStore[orderCode].items[code]) return;
+  if (!itemsData[code]) return;
   
-  if (!allOrdersStore[orderCode].items[code].branches[branch]) {
-    allOrdersStore[orderCode].items[code].branches[branch] = { target:0, actual:"", worker:"" };
+  if (!itemsData[code].branches) itemsData[code].branches = {};
+  if (!itemsData[code].branches[branch]) {
+    itemsData[code].branches[branch] = { target:0, actual:"", worker:"" };
   }
   
-  allOrdersStore[orderCode].items[code].branches[branch].actual = val;
-  allOrdersStore[orderCode].items[code].branches[branch].worker = workerName;
+  itemsData[code].branches[branch].actual = val;
+  itemsData[code].branches[branch].worker = workerName;
 
-  socket.emit('update-data', allOrdersStore);
+  updateDOMRow(branch, val, workerName);
+
+  // إرسال التحديث الجزئي السريع للسيرفر
+  socket.emit('update-item', {
+    orderCode: orderCode,
+    barcode: code,
+    branch: branch,
+    actual: val,
+    worker: workerName
+  });
 }
 
 var resBox = document.getElementById('resultBox');
@@ -362,7 +411,7 @@ resBox.addEventListener('click', function(e) {
   if (btn && currentCode) {
     e.stopPropagation();
     var branch = btn.getAttribute('data-branch');
-    if (branch && itemsData[currentCode].branches[branch]) {
+    if (branch && itemsData[currentCode] && itemsData[currentCode].branches[branch]) {
       updateBranchActual(currentCode, branch, itemsData[currentCode].branches[branch].target);
       safeFocus();
     }
