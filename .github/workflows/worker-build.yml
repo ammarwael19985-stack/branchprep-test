@@ -29,18 +29,14 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
-
-      - name: Initialize & Build Android Project
+      - name: Build Android APK
         run: |
           mkdir -p apk_output
-          yes | bubblewrap init --manifest="https://ammarwael19985-stack.github.io/branchprep-test/manifest.json" --directory=android_app || true
-          if [ -d "android_app" ]; then
-            cd android_app
-            yes | bubblewrap build || true
-            cp *.apk ../apk_output/BranchPrep-Worker.apk 2>/dev/null || cp app-release-signed.apk ../apk_output/BranchPrep-Worker.apk 2>/dev/null || true
-          fi
+          npm install -g @bubblewrap/cli
+          npx @bubblewrap/cli init --manifest="https://ammarwael19985-stack.github.io/branchprep-test/manifest.json" --directory=app_build --skipInfo
+          cd app_build
+          npx @bubblewrap/cli build --skipSigning || true
+          cp *.apk ../apk_output/BranchPrep-Worker.apk 2>/dev/null || find . -name "*.apk" -exec cp {} ../apk_output/ \; || true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
