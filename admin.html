@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BranchPrep - لوحة إدارة المستودع سيرفر داخلى تجريبى</title>
+<title>BranchPrep - لوحة إدارة المستودع (Render Server)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
   :root { --primary: #1f6f5c; --bg: #f4f6f8; --card: #ffffff; --text: #12181f; --success: #28a745; --muted: #6b6459; --line: #e2e8f0; --warning: #d97706; }
   body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
@@ -117,23 +118,15 @@
 
     <div class="progress-grid">
       <div class="prog-card">
-        <div class="p-title">
-          <span>📦 أصناف بدأ تحضيرها:</span>
-        </div>
+        <div class="p-title"><span>📦 أصناف بدأ تحضيرها:</span></div>
         <div class="p-num" id="startedItemsText">0 / 0 صنف</div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="startedItemsBar"></div>
-        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="startedItemsBar"></div></div>
       </div>
 
       <div class="prog-card">
-        <div class="p-title">
-          <span>✅ أصناف مكتملة 100%:</span>
-        </div>
+        <div class="p-title"><span>✅ أصناف مكتملة 100%:</span></div>
         <div class="p-num" style="color:#155724;" id="completedItemsText">0 / 0 صنف</div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill success" id="completedItemsBar"></div>
-        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill success" id="completedItemsBar"></div></div>
       </div>
 
       <div class="prog-card">
@@ -142,19 +135,13 @@
           <button class="btn-export-small" onclick="exportToExcel(true)" title="تصدير الأصناف قيد التحضير فقط إلى إكسيل">📥 تصدير</button>
         </div>
         <div class="p-num" style="color:#856404;" id="pendingItemsText">0 صنف</div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill warning" id="pendingItemsBar"></div>
-        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill warning" id="pendingItemsBar"></div></div>
       </div>
 
       <div class="prog-card">
-        <div class="p-title">
-          <span>🧩 إجمالي القطع الكلية:</span>
-        </div>
+        <div class="p-title"><span>🧩 إجمالي القطع الكلية:</span></div>
         <div class="p-num" id="totalQtyText">0% (0 / 0)</div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="totalQtyBar"></div>
-        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="totalQtyBar"></div></div>
       </div>
     </div>
 
@@ -168,20 +155,36 @@
           <th>الحالة</th>
         </tr>
       </thead>
-      <tbody id="itemsTableBody">
-      </tbody>
+      <tbody id="itemsTableBody"></tbody>
     </table>
   </div>
 </div>
 
 <script>
-const DB_URL = "https://branchprep-test-default-rtdb.europe-west1.firebasedatabase.app/";
+const SOCKET_SERVER = "https://branchprep-test.onrender.com";
+const socket = io(SOCKET_SERVER);
+
+let allOrdersStore = {};
 let currentActiveCode = localStorage.getItem('bp_admin_code') || null;
 let currentItemsData = null;
-let monitorInterval = null;
 
-// متغيّرات الفحص الذكي لتوفير البيانات
-let lastKnownUpdatedTime = null;
+socket.on('connect', () => {
+  console.log('Connected to Render Server');
+});
+
+socket.on('init-data', (data) => {
+  allOrdersStore = data || {};
+  if (currentActiveCode && allOrdersStore[currentActiveCode]) {
+    updateDashboardUI(allOrdersStore[currentActiveCode]);
+  }
+});
+
+socket.on('data-changed', (data) => {
+  allOrdersStore = data || {};
+  if (currentActiveCode && allOrdersStore[currentActiveCode]) {
+    updateDashboardUI(allOrdersStore[currentActiveCode]);
+  }
+});
 
 window.addEventListener('DOMContentLoaded', () => {
   if (currentActiveCode) showDashboard(currentActiveCode);
@@ -191,50 +194,22 @@ function showDashboard(code) {
   document.getElementById('uploadCard').classList.add('hidden');
   document.getElementById('liveDashboard').classList.remove('hidden');
   document.getElementById('orderCodeDisplay').textContent = code;
-  fetchOrderData(code);
-  startLiveMonitoring(code);
+  if (allOrdersStore[code]) {
+    updateDashboardUI(allOrdersStore[code]);
+  }
 }
 
-async function openExistingOrder() {
+function openExistingOrder() {
   const code = document.getElementById('oldCodeInput').value.trim();
   if(!code) return alert('برجاء كتابة كود الطلبية أولاً!');
 
-  document.getElementById('status').textContent = 'جاري البحث عن الطلبية...';
-  
-  try {
-    const res = await fetch(`${DB_URL}/orders/${code}.json`);
-    const data = await res.json();
-    
-    if(data && (data.items || data.activeSessions)) {
-      document.getElementById('status').textContent = '';
-      currentActiveCode = code;
-      localStorage.setItem('bp_admin_code', code);
-      showDashboard(code);
-    } else {
-      alert('لم يتم العثور على طلبية بهذا الكود! تأكد من الرقم.');
-      document.getElementById('status').textContent = '';
-    }
-  } catch(err) {
-    alert('تعذر الاتصال بالسيرفر!');
-    document.getElementById('status').textContent = '';
+  if(allOrdersStore[code]) {
+    currentActiveCode = code;
+    localStorage.setItem('bp_admin_code', code);
+    showDashboard(code);
+  } else {
+    alert('لم يتم العثور على طلبية بهذا الكود! تأكد من الرقم.');
   }
-}
-
-async function fetchOrderData(code) {
-  try {
-    const res = await fetch(`${DB_URL}/orders/${code}.json`);
-    const data = await res.json();
-    if (data) {
-      if (data._lastUpdated) {
-        lastKnownUpdatedTime = data._lastUpdated;
-      }
-      updateDashboardUI(data);
-      return data;
-    }
-  } catch(err) {
-    console.error("Error fetching order:", err);
-  }
-  return null;
 }
 
 const dropZone = document.getElementById('dropZone');
@@ -265,7 +240,7 @@ function handleFile(file) {
   reader.readAsArrayBuffer(file);
 }
 
-async function processExcelData(rows) {
+function processExcelData(rows) {
   if (rows.length < 2) return alert('الملف فارغ!');
   document.getElementById('status').textContent = 'جاري معالجة البيانات واستخرج الفروع...';
   
@@ -300,67 +275,24 @@ async function processExcelData(rows) {
   }
 
   const orderCode = Math.floor(1000 + Math.random() * 9000).toString();
-  document.getElementById('status').textContent = `تم العثور على ${branchCols.length} فروع.. جاري الرفع!`;
   
-  try {
-    const res = await fetch(`${DB_URL}/orders/${orderCode}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ createdAt: new Date().toISOString(), _lastUpdated: Date.now(), items: items })
-    });
+  allOrdersStore[orderCode] = {
+    createdAt: new Date().toISOString(),
+    _lastUpdated: Date.now(),
+    items: items,
+    activeSessions: {}
+  };
 
-    if (res.ok) {
-      document.getElementById('status').textContent = '';
-      currentActiveCode = orderCode;
-      localStorage.setItem('bp_admin_code', orderCode);
-      showDashboard(orderCode);
-    }
-  } catch(err) {
-    alert('حدث خطأ في الاتصال بالسحابة!');
-  }
-}
+  socket.emit('update-data', allOrdersStore);
 
-function startLiveMonitoring(orderCode) {
-  if(monitorInterval) clearInterval(monitorInterval);
-  // فحص خفيف جداً لتوفير استهلاك الترافيك 100%
-  monitorInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`${DB_URL}/orders/${orderCode}/_lastUpdated.json`);
-      const serverTime = await res.json();
-      if (serverTime && serverTime !== lastKnownUpdatedTime) {
-        lastKnownUpdatedTime = serverTime;
-        fetchOrderData(orderCode);
-      } else {
-        // فحص تواجد الموظفين فقط بخفة
-        const sRes = await fetch(`${DB_URL}/orders/${orderCode}/activeSessions.json`);
-        const sessions = await sRes.json();
-        if (sessions) updateActiveWorkersOnly(sessions);
-      }
-    } catch(err) {}
-  }, 2000);
-}
-
-function updateActiveWorkersOnly(sessions) {
-  const activeWorkersMap = {};
-  Object.keys(sessions || {}).forEach(sKey => {
-    const sess = sessions[sKey];
-    if (sess && sess.name && sess.timestamp) {
-      if (Date.now() - sess.timestamp < 6000) {
-        activeWorkersMap[sess.name] = true;
-      }
-    }
-  });
-
-  const workersArr = Object.keys(activeWorkersMap);
-  const workersContainer = document.getElementById('workersListContainer');
-  if (workersArr.length > 0) {
-    workersContainer.innerHTML = workersArr.map(w => `<span class="worker-badge">${w}</span>`).join('');
-  } else {
-    workersContainer.innerHTML = `<span style="color:#888; font-size:0.85rem;">لا يوجد موظفين متواجدين حالياً</span>`;
-  }
+  document.getElementById('status').textContent = '';
+  currentActiveCode = orderCode;
+  localStorage.setItem('bp_admin_code', orderCode);
+  showDashboard(orderCode);
 }
 
 function updateDashboardUI(orderData) {
+  if (!orderData) return;
   const items = orderData.items || {};
   const sessions = orderData.activeSessions || {};
   currentItemsData = items;
@@ -382,7 +314,7 @@ function updateDashboardUI(orderData) {
   Object.keys(sessions).forEach(sKey => {
     const sess = sessions[sKey];
     if (sess && sess.name && sess.timestamp) {
-      if (Date.now() - sess.timestamp < 6000) {
+      if (Date.now() - sess.timestamp < 10000) {
         activeWorkersMap[sess.name] = true;
       }
     }
@@ -396,7 +328,7 @@ function updateDashboardUI(orderData) {
     let isBeingPrepared = false;
 
     if (item.lock && item.lock.worker && item.lock.timestamp) {
-      if (Date.now() - item.lock.timestamp < 6000) {
+      if (Date.now() - item.lock.timestamp < 10000) {
         activeWorkersMap[item.lock.worker] = true;
       }
     }
@@ -430,7 +362,7 @@ function updateDashboardUI(orderData) {
       }
     }
 
-    if (!isBeingPrepared && !(item.lock && Date.now() - item.lock.timestamp < 6000)) return;
+    if (!isBeingPrepared && !(item.lock && Date.now() - item.lock.timestamp < 10000)) return;
 
     hasVisibleItems = true;
     const tr = document.createElement('tr');
@@ -476,8 +408,7 @@ function updateDashboardUI(orderData) {
   document.getElementById('totalQtyBar').style.width = `${totalQtyPercent}%`;
 }
 
-// تصدير الإكسيل بدون استهلاك شبكة زيادة
-async function exportToExcel(onlyPending) {
+function exportToExcel(onlyPending) {
   if (!currentActiveCode) return alert('لا توجد طلبية نشطة!');
   
   const btn = document.getElementById('exportBtn');
@@ -486,8 +417,7 @@ async function exportToExcel(onlyPending) {
   btn.disabled = true;
 
   try {
-    const freshData = await fetchOrderData(currentActiveCode);
-    const items = (freshData && freshData.items) ? freshData.items : currentItemsData;
+    const items = currentItemsData;
 
     if (!items) {
       alert('لا توجد بيانات لتصديرها!');
@@ -565,7 +495,6 @@ async function exportToExcel(onlyPending) {
       : `تقرير_طلبية_${currentActiveCode}.xlsx`;
 
     XLSX.writeFile(workbook, fileName);
-    showDownloadToast(fileName);
 
   } catch(err) {
     alert("حدث خطأ أثناء إعداد التقرير، أعد المحاولة!");
@@ -575,40 +504,8 @@ async function exportToExcel(onlyPending) {
   btn.disabled = false;
 }
 
-function showDownloadToast(fileName) {
-  const existingToast = document.getElementById('excelDownloadToast');
-  if (existingToast) existingToast.remove();
-
-  const toast = document.createElement('div');
-  toast.id = 'excelDownloadToast';
-  toast.style.cssText = `
-    position: fixed;
-    bottom: 25px;
-    right: 25px;
-    background-color: #1f6f5c;
-    color: white;
-    padding: 14px 20px;
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-family: inherit;
-  `;
-
-  toast.innerHTML = `
-    <span style="font-size:1.1rem;">📊 تم تصدير الملف بنجاح!</span>
-    <span style="font-size:0.88rem; background:rgba(255,255,255,0.2); padding:4px 8px; border-radius:4px;">تجد الملف الآن في مجلد التحميلات (Downloads)</span>
-  `;
-
-  document.body.appendChild(toast);
-  setTimeout(() => { if (toast) toast.remove(); }, 6000);
-}
-
 function resetCurrentOrder() {
-  if(confirm('هل تريد الخروج من شاشة متابعة هذه الطلبية؟ (يمكنك العودة إليها لاحقاً بكتابة الكود)')) {
-    if(monitorInterval) clearInterval(monitorInterval);
+  if(confirm('هل تريد الخروج من شاشة متابعة هذه الطلبية؟')) {
     localStorage.removeItem('bp_admin_code');
     location.reload();
   }
