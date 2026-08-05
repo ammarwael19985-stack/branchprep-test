@@ -1,15 +1,12 @@
 name: Build Worker Mobile APK
 
 on:
-  push:
-    paths:
-      - 'index.html'
-      - '.github/workflows/worker-build.yml'
   workflow_dispatch:
 
 jobs:
   build-worker:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -17,15 +14,21 @@ jobs:
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
+          distribution: 'zulu'
           java-version: '17'
-          distribution: 'temurin'
 
-      - name: Build Android APK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK with Cordova/Capacitor or Bubblewrap
         run: |
-          echo "Building Worker APK..."
+          # هنا خطوة البناء الخاصة بك أو نسخ ملفات التطبيق
+          mkdir -p output
+          # افتراضياً للتأكد من إن المسار موجود
+          echo "Building APK..."
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BranchPrep-Worker-APK
-          path: '*.apk'
+          path: '**/*.apk'
