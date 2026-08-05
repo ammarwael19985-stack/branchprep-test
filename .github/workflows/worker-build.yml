@@ -1,6 +1,10 @@
 name: Build Worker Mobile APK
 
 on:
+  push:
+    paths:
+      - 'index.html'
+      - '.github/workflows/worker-build.yml'
   workflow_dispatch:
 
 jobs:
@@ -14,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '20'
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -25,17 +29,29 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install PWABuilder CLI
-        run: npm install -g @pwabuilder/cli
-
-      - name: Build APK File
+      - name: Build Web Assets for Capacitor
         run: |
-          mkdir -p apk_output
-          pwa2apk -u "https://ammarwael19985-stack.github.io/branchprep-test/" -o apk_output || true
-          find . -name "*.apk" -exec cp {} apk_output/ \; || true
+          mkdir -p www
+          cp index.html www/
+          cp manifest.json www/ 2>/dev/null || true
+          cp *.png www/ 2>/dev/null || true
+
+      - name: Install Capacitor & Build Android Project
+        run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init BranchPrepWorker com.branchprep.worker --web-dir www
+          npx cap add android
+          npx cap sync android
+
+      - name: Build APK via Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BranchPrep-Worker-APK
-          path: apk_output/*.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
