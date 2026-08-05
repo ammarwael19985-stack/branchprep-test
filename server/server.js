@@ -20,10 +20,47 @@ let ordersData = {};
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  // إرسال البيانات الكلية عند أول اتصال فقط
   socket.emit('init-data', ordersData);
 
-  // تحديث جزئي سريع للأصناف والفروع (خفيف جداً ولا يسبب أي تهنيج)
+  // طلب حجز/قفل صنف لموظف
+  socket.on('acquire-lock', ({ orderCode, barcode, workerName, sessionId }) => {
+    if (ordersData[orderCode] && ordersData[orderCode].items[barcode]) {
+      const item = ordersData[orderCode].items[barcode];
+      const now = Date.now();
+
+      // إذا لم يكن هناك قفل أو انتهت مدة القفل القديم (15 ثانية)
+      if (!item.lock || item.lock.sessionId === sessionId || (now - (item.lock.timestamp || 0) > 15000)) {
+        item.lock = { worker: workerName, sessionId, timestamp: now };
+        io.emit('lock-changed', { orderCode, barcode, lock: item.lock });
+      } else {
+        socket.emit('lock-changed', { orderCode, barcode, lock: item.lock });
+      }
+    }
+  });
+
+  // تجديد وقت القفل (Keep alive)
+  socket.on('keep-lock-alive', ({ orderCode, barcode, sessionId }) => {
+    if (ordersData[orderCode] && ordersData[orderCode].items[barcode]) {
+      const item = ordersData[orderCode].items[barcode];
+      if (item.lock && item.lock.sessionId === sessionId) {
+        item.lock.timestamp = Date.now();
+        io.emit('lock-changed', { orderCode, barcode, lock: item.lock });
+      }
+    }
+  });
+
+  // فك القفل عند ترك الصنف أو المسح الجديد
+  socket.on('release-lock', ({ orderCode, barcode, sessionId }) => {
+    if (ordersData[orderCode] && ordersData[orderCode].items[barcode]) {
+      const item = ordersData[orderCode].items[barcode];
+      if (item.lock && item.lock.sessionId === sessionId) {
+        delete item.lock;
+        io.emit('lock-changed', { orderCode, barcode, lock: null });
+      }
+    }
+  });
+
+  // تحديث جزئي سريع للأصناف والفروع
   socket.on('update-item', ({ orderCode, barcode, branch, actual, worker }) => {
     if (ordersData[orderCode] && ordersData[orderCode].items[barcode]) {
       const item = ordersData[orderCode].items[barcode];
@@ -34,12 +71,11 @@ io.on('connection', (socket) => {
       item.branches[branch].worker = worker;
       ordersData[orderCode]._lastUpdated = Date.now();
 
-      // إرسال التحديث الجزئي فقط لجميع الأجهزة فوراً
       io.emit('item-updated', { orderCode, barcode, branch, actual, worker });
     }
   });
 
-  // تحديث الجلسات النشطة للموظفين فقط (خفيف وبدون إعادة رسم الشاشة)
+  // تحديث نبض التواجد للموظف
   socket.on('worker-heartbeat', ({ orderCode, workerName }) => {
     if (ordersData[orderCode]) {
       if (!ordersData[orderCode].activeSessions) ordersData[orderCode].activeSessions = {};
@@ -50,7 +86,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // التحديث الكلي (يستخدم عند رفع طلبية جديدة من الإكسيل فقط)
   socket.on('update-data', (data) => {
     ordersData = data;
     io.emit('data-changed', ordersData);
@@ -62,7 +97,7 @@ io.on('connection', (socket) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('BranchPrep Fast Server is Running Successfully!');
+  res.send('BranchPrep Fast Server with Locking is Running Successfully!');
 });
 
 const PORT = process.env.PORT || 3000;
