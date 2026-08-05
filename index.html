@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BranchPrep - تحضير الفروع بالباركود</title>
+<style>
+  :root {
+    --ink:#12181f;
+    --paper:#f5f3ee;
+    --panel:#ffffff;
+    --line:#dcd6c9;
+    --accent:#1f6f5c;
+    --accent-dark:#154d40;
+    --warn:#b3452b;
+    --muted:#6b6459;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:0;
+    background:var(--paper); color:var(--ink);
+    font-family:'Tahoma','Segoe UI',sans-serif;
+    min-height:100vh;
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:20px 16px 60px; }
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 4px 20px; border-bottom:2px solid var(--ink); margin-bottom:22px;
+  }
+  header h1 { font-size:1.15rem; margin:0; font-weight:800; }
+  header .tag { font-size:.7rem; color:var(--muted); border:1px solid var(--line); padding:3px 8px; border-radius:20px; }
+  
+  .login-card {
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:34px 22px; text-align:center;
+  }
+  .login-card input {
+    width:100%; padding:14px; margin-bottom:12px; border-radius:10px;
+    border:1px solid var(--line); font-size:1.1rem; text-align:center; font-weight:bold;
+  }
+  .login-card input:focus { outline:2px solid var(--accent); }
+
+  .file-btn {
+    display:inline-block; background:var(--accent); color:#fff;
+    padding:13px 28px; border-radius:10px; font-weight:700;
+    font-size:.95rem; cursor:pointer; border:none; width:100%;
+  }
+  .file-btn:active { background:var(--accent-dark); }
+
+  .status-bar {
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:10px 14px; margin-bottom:16px;
+    font-size:.78rem; color:var(--muted);
+  }
+  .status-bar b { color:var(--ink); }
+  .status-bar button {
+    background:none; border:1px solid var(--line); border-radius:8px;
+    padding:6px 12px; font-size:.75rem; color:var(--warn); cursor:pointer;
+  }
+
+  .worker-warning {
+    background:#fbeae5; border:2px solid var(--warn); color:var(--warn);
+    padding:12px 14px; border-radius:10px; font-weight:bold; font-size:0.95rem;
+    margin-bottom:14px; text-align:center; display:none;
+    box-shadow: 0 4px 10px rgba(179,69,43,0.15);
+  }
+
+  .scan-box { background:var(--ink); border-radius:14px; padding:20px; margin-bottom:18px; }
+  .scan-box label { color:#c9c2b3; font-size:.8rem; display:block; margin-bottom:8px; }
+  .scan-box input {
+    width:100%; padding:16px 14px; font-size:1.3rem; border-radius:10px;
+    border:none; text-align:center; letter-spacing:1px; font-weight:700;
+  }
+  .scan-box input:focus { outline:3px solid var(--accent); }
+  
+  .result { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:16px; }
+  .result .pname { font-size:1.15rem; font-weight:800; margin-bottom:2px; }
+  .result .pbarcode { font-size:.78rem; color:var(--muted); margin-bottom:16px; direction:ltr; display:inline-block; }
+  .branch-table { width:100%; border-collapse:collapse; }
+  .branch-table tr { border-bottom:1px solid var(--line); }
+  .branch-table tr:last-child { border-bottom:none; }
+  .branch-table td { padding:12px 4px; font-size:1rem; }
+  .branch-table td.qty { text-align:left; font-weight:800; font-size:1.25rem; color:var(--accent-dark); white-space:nowrap; }
+  .branch-table tr.zero td.qty { color:#b7b1a3; }
+  .total-row td { font-weight:800; padding-top:14px; border-top:2px solid var(--ink); }
+  .total-row td.qty { color:var(--ink); font-size:1.3rem; }
+  
+  .branch-table td.check { width:38px; text-align:center; padding:0 2px; }
+  .fill-btn {
+    background:#faf8f2; border:1px solid var(--line); border-radius:8px;
+    width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:1rem; color:var(--accent-dark); transition:all 0.15s ease;
+  }
+  .fill-btn:active { background:var(--accent); color:#fff; border-color:var(--accent); transform:scale(0.92); }
+  .fill-btn:disabled { opacity:0.2; cursor:not-allowed; pointer-events:none; }
+  tr.branch-done td { color:#9a9488; }
+  tr.branch-done td.qty { color:#9a9488; text-decoration:line-through; }
+  tr.branch-done td:first-child { text-decoration:line-through; }
+  .branch-table tr[data-branch] { cursor:pointer; }
+  .branch-table tr.selected td:first-child { font-weight:800; color:var(--accent-dark); }
+  .branch-table tr.selected { background:#eef3ee; }
+  .progress-note { font-size:.78rem; color:var(--muted); margin-bottom:14px; }
+  .branch-table td.actual { width:78px; padding:6px 4px; }
+  .actual-input {
+    width:100%; padding:8px 4px; border:1px solid var(--line); border-radius:8px;
+    text-align:center; font-size:1rem; font-weight:700; color:var(--ink); background:#faf8f2;
+  }
+  .actual-input:focus { outline:2px solid var(--accent); border-color:var(--accent); background:#ffffff; }
+  .actual-input:disabled { background:#e2ded8 !important; color:#999 !important; cursor:not-allowed; border-color:#ccc; }
+
+  .branch-table td.zero-note { color:#b7b1a3; font-size:.8rem; text-align:center; }
+  .not-found {
+    background:#fbeae5; border:1px solid #e3b6a6; color:var(--warn);
+    border-radius:14px; padding:24px; text-align:center; font-size:1rem; font-weight:700;
+  }
+  .not-found .code { display:block; margin-top:6px; font-weight:400; font-size:.85rem; direction:ltr; }
+  .placeholder { text-align:center; color:var(--muted); padding:40px 10px; font-size:.9rem; }
+  .history { margin-top:22px; }
+  .history h3 { font-size:.8rem; color:var(--muted); margin:0 0 10px; font-weight:700; }
+  .history-item { display:flex; justify-content:space-between; padding:8px 4px; font-size:.82rem; border-bottom:1px solid var(--line); }
+  .history-item span.code { color:var(--muted); direction:ltr; }
+  .error-msg { background:#fbeae5; border:1px solid #e3b6a6; color:var(--warn); padding:12px 14px; border-radius:10px; font-size:.85rem; margin-top:16px; display:none; }
+</style>
+</head>
+<body>
+
+<div id="appSplash" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#1f6f5c; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:999999; transition: opacity 0.4s ease;">
+  <img src="icon-512.png" alt="BranchPrep" style="width:130px; height:130px; border-radius:24px; box-shadow:0 8px 24px rgba(0,0,0,0.25); margin-bottom:16px; object-fit:cover;">
+  <h2 style="color:white; margin:0; font-size:1.4rem; font-family:sans-serif; font-weight:bold;">BranchPrep Worker</h2>
+  <p style="color:rgba(255,255,255,0.8); margin-top:6px; font-size:0.85rem; font-family:sans-serif;">جاري تحميل التطبيق...</p>
+</div>
+
+<script>
+  // إخفاء الشاشة الترحيبية بعد ثانية من التحميل
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      var splash = document.getElementById('appSplash');
+      if (splash) {
+        splash.style.opacity = '0';
+        setTimeout(function() { splash.remove(); }, 400);
+      }
+    }, 800);
+  });
+</script>
+
+<div class="wrap">
+  <header>
+    <h1>BranchPrep <span style="background:var(--accent);color:#fff;font-size:.62rem;padding:2px 8px;border-radius:10px;vertical-align:middle;">تحضير الفروع</span></h1>
+    <span class="tag" id="statusTag">جاهز</span>
+  </header>
+
+  <div id="loginScreen">
+    <div class="login-card">
+      <h2 style="margin-top:0;">مرحباً بك 📦</h2>
+      <p style="color:var(--muted); font-size:0.85rem; margin-bottom:20px;">ادخل اسمك وكود الطلبية للبدء</p>
+      <input type="text" id="workerNameInput" placeholder="اسم الموظف (مثال: عمار)" />
+      <input type="number" id="orderCodeInput" placeholder="كود الطلبية (4 أرقام)" />
+      <button class="file-btn" id="loginBtn" type="button" onclick="loginToOrder()">دخول للتحضير 🚀</button>
+      <div class="error-msg" id="loginError"></div>
+    </div>
+  </div>
+
+  <div id="scanScreen" style="display:none;">
+    <div class="status-bar">
+      <span>الموظف: <b id="workerLabel">-</b> | الطلبية: <b id="codeLabel">-</b></span>
+      <div>
+        <button id="logoutBtn" onclick="logout()">🚪 خروج</button>
+      </div>
+    </div>
+
+    <div class="scan-box">
+      <label>اضرب الباركود دلوقتي</label>
+      <form id="scanForm">
+        <input type="text" id="barcodeInput" inputmode="none" placeholder="امسح الباركود" autocomplete="off" />
+      </form>
+    </div>
+
+    <div id="workerWarning" class="worker-warning"></div>
+
+    <div id="placeholder" class="placeholder">فى انتظار مسح أول باركود عشان تطلعلك الكميات هنا</div>
+    <div id="resultBox" class="result" style="display:none;"></div>
+    <div id="notFoundBox" class="not-found" style="display:none;"></div>
+
+    <div class="history" id="historyBox" style="display:none;">
+      <h3>آخر عمليات المسح</h3>
+      <div id="historyList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var DB_URL = "https://branchprep-default-rtdb.firebaseio.com";
+var workerName = "";
+var orderCode = "";
+var itemsData = {};
+var branchNames = [];
+var historyListArr = [];
+var currentCode = null;
+var activeBranch = null;
+var pollInterval = null;
+
+var isEditingManualInput = false;
+var localModifiedBranches = {};
+
+// متغيّرات الفحص الذكي وتحديد الجلسة
+var lastKnownUpdatedTime = null;
+var sessionId = Math.random().toString(36).substring(2, 9);
+
+try {
+  workerName = localStorage.getItem('bp_worker') || "";
+  orderCode = localStorage.getItem('bp_code') || "";
+} catch(e){}
+
+var barcodeInput = document.getElementById('barcodeInput');
+barcodeInput.addEventListener('click', function() {
+  this.removeAttribute('inputmode');
+});
+window.onload = function() {
+  try {
+    if (workerName && orderCode) {
+      document.getElementById('workerNameInput').value = workerName;
+      document.getElementById('orderCodeInput').value = orderCode;
+      openScanScreen();
+      fetchLatestData(true);
+    }
+  } catch(e) {}
+};
+
+function loginToOrder() {
+  try {
+    var wName = document.getElementById('workerNameInput').value.trim();
+    var oCode = document.getElementById('orderCodeInput').value.trim();
+    var errDiv = document.getElementById('loginError');
+
+    if (!wName || !oCode) {
+      errDiv.style.display = 'block';
+      errDiv.textContent = 'برجاء كتابة الاسم وكود الطلبية أولاً';
+      return;
+    }
+    errDiv.style.display = 'none';
+    workerName = wName;
+    orderCode = oCode;
+
+    try {
+      localStorage.setItem('bp_worker', workerName);
+      localStorage.setItem('bp_code', orderCode);
+    } catch(e){}
+
+    openScanScreen();
+    fetchLatestData(true);
+  } catch(e) {
+    alert("حدث خطأ في التسجيل، جرب مرة أخرى.");
+  }
+}
+
+function openScanScreen() {
+  document.getElementById('workerLabel').textContent = workerName;
+  document.getElementById('codeLabel').textContent = orderCode;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('scanScreen').style.display = 'block';
+  document.getElementById('statusTag').textContent = 'جاهز للمسح';
+  safeFocus();
+
+  if (!pollInterval) {
+    pollInterval = setInterval(function() {
+      smartFetchCheck();
+      sendSessionHeartbeat();
+      if(currentCode) {
+        keepLockAlive(currentCode);
+        checkCurrentItemLock(currentCode);
+      }
+    }, 2000);
+  }
+}
+
+function sendSessionHeartbeat() {
+  if (!workerName || !orderCode) return;
+  var cleanKey = workerName.replace(/[.#$\[\]]/g, "_");
+  fetch(DB_URL + '/orders/' + orderCode + '/activeSessions/' + cleanKey + '.json', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: workerName, timestamp: Date.now() })
+  }).catch(function(e){});
+}
+
+function smartFetchCheck() {
+  if (!orderCode) return;
+  fetch(DB_URL + '/orders/' + orderCode + '/_lastUpdated.json')
+    .then(function(res) { return res.json(); })
+    .then(function(serverTime) {
+      if (serverTime && serverTime !== lastKnownUpdatedTime) {
+        lastKnownUpdatedTime = serverTime;
+        fetchLatestData(false);
+      }
+    })
+    .catch(function(e) {});
+}
+
+function checkCurrentItemLock(code) {
+  if (!orderCode || !code) return;
+  fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock.json')
+    .then(function(res) { return res.json(); })
+    .then(function(lockData) {
+      if (itemsData[code]) {
+        itemsData[code].lock = lockData;
+        if (!isEditingManualInput) {
+          renderResult(code, itemsData[code], activeBranch);
+        }
+      }
+    })
+    .catch(function(e) {});
+}
+
+function fetchLatestData(force) {
+  if (!orderCode) return;
+
+  fetch(DB_URL + '/orders/' + orderCode + '.json')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data && data.items) {
+        if (data._lastUpdated) {
+          lastKnownUpdatedTime = data._lastUpdated;
+        }
+
+        Object.keys(data.items).forEach(function(codeKey) {
+          if (!itemsData[codeKey]) {
+            itemsData[codeKey] = data.items[codeKey];
+          } else {
+            itemsData[codeKey].product = data.items[codeKey].product;
+            itemsData[codeKey].lock = data.items[codeKey].lock;
+            
+            var sBranches = data.items[codeKey].branches || {};
+            if (!itemsData[codeKey].branches) itemsData[codeKey].branches = {};
+
+            Object.keys(sBranches).forEach(function(bName) {
+              var modKey = codeKey + "_" + bName;
+              if (!itemsData[codeKey].branches[bName]) {
+                itemsData[codeKey].branches[bName] = sBranches[bName];
+              } else {
+                itemsData[codeKey].branches[bName].target = sBranches[bName].target;
+                if (!localModifiedBranches[modKey]) {
+                  itemsData[codeKey].branches[bName].actual = sBranches[bName].actual;
+                  itemsData[codeKey].branches[bName].worker = sBranches[bName].worker;
+                }
+              }
+            });
+          }
+        });
+
+        var branchesSet = {};
+        Object.keys(itemsData).forEach(function(k) {
+          var item = itemsData[k];
+          if (item && item.branches) {
+            Object.keys(item.branches).forEach(function(b) { branchesSet[b] = true; });
+          }
+        });
+        branchNames = Object.keys(branchesSet);
+        document.getElementById('statusTag').textContent = 'جاهز للمسح';
+        
+        if (currentCode && itemsData[currentCode] && !isEditingManualInput) {
+          renderResult(currentCode, itemsData[currentCode], activeBranch);
+        }
+      }
+    })
+    .catch(function(err) {});
+}
+
+function updateServerLastUpdated() {
+  if (!orderCode) return;
+  fetch(DB_URL + '/orders/' + orderCode + '/_lastUpdated.json', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Date.now())
+  }).catch(function(e){});
+}
+
+function logout() {
+  var confirmExit = confirm("هل أنت متأكد من تسجيل الخروج؟");
+  if (confirmExit) {
+    if (pollInterval) clearInterval(pollInterval);
+    if (workerName && orderCode) {
+      var cleanKey = workerName.replace(/[.#$\[\]]/g, "_");
+      fetch(DB_URL + '/orders/' + orderCode + '/activeSessions/' + cleanKey + '.json', { method: 'DELETE' }).catch(function(e){});
+      if (currentCode) unlockCode(currentCode);
+    }
+
+    try {
+      localStorage.removeItem('bp_worker');
+      localStorage.removeItem('bp_code');
+    } catch(e){}
+    location.reload();
+  }
+}
+
+function safeFocus() {
+  if (isEditingManualInput) return;
+  setTimeout(function() {
+    barcodeInput.setAttribute('inputmode', 'none');
+    try { barcodeInput.focus({ preventScroll: true }); } catch (e) { barcodeInput.focus(); }
+  }, 100);
+}
+
+document.getElementById('scanForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var code = barcodeInput.value.trim();
+  if (!code) return;
+
+  if (code === currentCode && itemsData[code]) {
+    var lockWorker = getActiveLockWorker(itemsData[code]);
+    if (!lockWorker && activeBranch) {
+      var currentVal = Number(itemsData[code].branches && itemsData[code].branches[activeBranch] ? itemsData[code].branches[activeBranch].actual : 0) || 0;
+      updateBranchActual(code, activeBranch, currentVal + 1);
+    }
+    barcodeInput.value = '';
+    safeFocus();
+    return;
+  }
+  document.getElementById('placeholder').style.display = 'none';
+
+  if (itemsData[code]) {
+    if (currentCode && currentCode !== code) {
+      unlockCode(currentCode);
+    }
+
+    document.getElementById('notFoundBox').style.display = 'none';
+    document.getElementById('resultBox').style.display = 'block';
+    activeBranch = null;
+    
+    tryAcquireLock(code);
+
+    historyListArr.unshift({ name: itemsData[code].product || code, code: code });
+    historyListArr = historyListArr.slice(0, 8);
+    renderHistory();
+  } else {
+    currentCode = null;
+    activeBranch = null;
+    document.getElementById('resultBox').style.display = 'none';
+    document.getElementById('notFoundBox').style.display = 'block';
+    document.getElementById('workerWarning').style.display = 'none';
+    document.getElementById('notFoundBox').innerHTML = 'الباركود ده مش موجود في الطلبية <span class="code">' + escapeHtml(code) + '</span>';
+  }
+
+  barcodeInput.value = '';
+  safeFocus();
+});
+
+function getActiveLockWorker(row) {
+  if (row && row.lock && row.lock.sessionId && row.lock.sessionId !== sessionId) {
+    if (Date.now() - (row.lock.timestamp || 0) < 15000) {
+      return row.lock.worker || "موظف آخر";
+    }
+  }
+  return null;
+}
+
+function tryAcquireLock(code) {
+  if (!workerName || !code) return;
+
+  fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock.json')
+    .then(function(res) { return res.json(); })
+    .then(function(serverLock) {
+      var now = Date.now();
+      if (serverLock && serverLock.sessionId && serverLock.sessionId !== sessionId && (now - (serverLock.timestamp || 0) < 15000)) {
+        if (!itemsData[code]) itemsData[code] = {};
+        itemsData[code].lock = serverLock;
+        renderResult(code, itemsData[code], activeBranch);
+      } else {
+        var lockData = { worker: workerName, sessionId: sessionId, timestamp: now };
+        if (!itemsData[code]) itemsData[code] = {};
+        itemsData[code].lock = lockData;
+
+        fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock.json', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(lockData)
+        }).catch(function(e){});
+
+        renderResult(code, itemsData[code], activeBranch);
+      }
+    })
+    .catch(function(e){
+      renderResult(code, itemsData[code], activeBranch);
+    });
+}
+
+function keepLockAlive(code) {
+  if (!workerName || !code) return;
+  var item = itemsData[code];
+  if (item && item.lock && item.lock.sessionId === sessionId) {
+    item.lock.timestamp = Date.now();
+    fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock/timestamp.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Date.now())
+    }).catch(function(e){});
+  }
+}
+
+function unlockCode(code) {
+  if (!workerName || !code) return;
+  var item = itemsData[code];
+  if (item && item.lock && item.lock.sessionId === sessionId) {
+    delete item.lock;
+    fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/lock.json', {
+      method: 'DELETE'
+    }).catch(function(e){});
+  }
+}
+
+function renderResult(code, row, focusBranch) {
+  currentCode = code;
+  var total = 0;
+  var doneCount = 0;
+  var neededCount = 0;
+  var rowsHtml = '';
+  if (focusBranch !== undefined) activeBranch = focusBranch;
+
+  var lockWorker = getActiveLockWorker(row);
+  var isReadOnly = !!lockWorker;
+
+  var warnBox = document.getElementById('workerWarning');
+  if (isReadOnly) {
+    warnBox.style.display = 'block';
+    warnBox.innerHTML = '🔒 <b>تنبيه:</b> الموظف (<b>' + escapeHtml(lockWorker) + '</b>) متواجد شغال على هذا المنتج حالياً!<br><small style="font-weight:normal;">التعديل مقفول عليك حالياً ومتاح فقط للموظف (<b>' + escapeHtml(lockWorker) + '</b>).</small>';
+  } else {
+    warnBox.style.display = 'none';
+  }
+
+  branchNames.forEach(function(bName) {
+    var bData = (row.branches && row.branches[bName]) ? row.branches[bName] : { target:0, actual:"", worker:"" };
+    var qtyNum = Number(bData.target) || 0;
+    var actualVal = bData.actual;
+    var actualNum = Number(actualVal) || 0;
+    
+    total += qtyNum;
+    var isZero = qtyNum === 0;
+
+    var actionCell;
+    var doneClass = '';
+    var selectedClass = '';
+
+    if (isZero) {
+      actionCell = '<td class="zero-note">لا يحتاج</td><td></td>';
+    } else {
+      neededCount++;
+      var isComplete = actualVal !== '' && actualNum >= qtyNum;
+      if (isComplete) { doneCount++; doneClass = ' branch-done'; }
+      if (bName === activeBranch) selectedClass = ' selected';
+
+      var disabledAttr = isReadOnly ? 'disabled="disabled"' : '';
+
+      actionCell =
+        '<td class="actual"><input type="number" inputmode="numeric" class="actual-input" data-branch="' + escapeHtml(bName) + '" placeholder="0" value="' + escapeHtml(String(actualVal)) + '" ' + disabledAttr + ' onclick="event.stopPropagation();" /></td>' +
+        '<td class="check"><button type="button" class="fill-btn" data-branch="' + escapeHtml(bName) + '" ' + disabledAttr + '>⚡</button></td>';
+    }
+
+    var zeroClass = isZero ? ' zero' : '';
+    var workerText = bData.worker ? ' <small style="color:#217346; font-weight:bold;">(' + escapeHtml(bData.worker) + ')</small>' : '';
+    
+    rowsHtml += '<tr id="branch_row_' + escapeHtml(bName) + '" class="' + (zeroClass + doneClass + selectedClass).trim() + '" data-branch="' + escapeHtml(bName) + '">' +
+      '<td>' + escapeHtml(bName) + '<span class="w-label">' + workerText + '</span></td>' +
+      '<td class="qty">' + qtyNum + '</td>' +
+      actionCell +
+      '</tr>';
+  });
+
+  rowsHtml += '<tr class="total-row"><td>الإجمالي</td><td class="qty">' + total + '</td><td></td><td></td></tr>';
+
+  document.getElementById('resultBox').innerHTML =
+    '<div class="pname">' + escapeHtml(row.product || code) + '</div>' +
+    (row.product ? '<div class="pbarcode">' + escapeHtml(code) + '</div>' : '') +
+    '<div class="progress-note">اتحضر <span id="doneCountText">' + doneCount + '</span> من ' + neededCount + ' فرع محتاج تحضير — دوس على الفرع واضغط الباركود لتسجيله، أو (⚡) للملء.</div>' +
+    '<table class="branch-table"><tbody>' + rowsHtml + '</tbody></table>';
+}
+
+function updateBranchActual(code, branch, val, skipRender) {
+  if (!code || !branch) return;
+  if (!itemsData[code]) return;
+  
+  if (getActiveLockWorker(itemsData[code])) return;
+
+  var modKey = code + "_" + branch;
+  localModifiedBranches[modKey] = true;
+
+  if (!itemsData[code].branches) itemsData[code].branches = {};
+  if (!itemsData[code].branches[branch]) {
+    itemsData[code].branches[branch] = { target:0, actual:"", worker:"" };
+  }
+  
+  itemsData[code].branches[branch].actual = val;
+  itemsData[code].branches[branch].worker = workerName;
+
+  if (!skipRender) {
+    renderResult(code, itemsData[code], branch);
+  } else {
+    var rowEl = document.getElementById('branch_row_' + branch);
+    if (rowEl) {
+      var targetQty = Number(itemsData[code].branches[branch].target) || 0;
+      var numVal = Number(val) || 0;
+      if (val !== '' && numVal >= targetQty) {
+        rowEl.classList.add('branch-done');
+      } else {
+        rowEl.classList.remove('branch-done');
+      }
+      var wLabel = rowEl.querySelector('.w-label');
+      if (wLabel) {
+        wLabel.innerHTML = workerName ? ' <small style="color:#217346; font-weight:bold;">(' + escapeHtml(workerName) + ')</small>' : '';
+      }
+    }
+  }
+
+  fetch(DB_URL + '/orders/' + orderCode + '/items/' + code + '/branches/' + branch + '.json', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actual: val, worker: workerName })
+  }).then(function() {
+    updateServerLastUpdated();
+    setTimeout(function() { delete localModifiedBranches[modKey]; }, 3000);
+  }).catch(function(e){});
+}
+
+var resBox = document.getElementById('resultBox');
+
+resBox.addEventListener('focusin', function(e) {
+  var input = e.target.closest('.actual-input');
+  if (input) {
+    isEditingManualInput = true;
+  }
+});
+
+resBox.addEventListener('focusout', function(e) {
+  var input = e.target.closest('.actual-input');
+  if (input) {
+    setTimeout(function() {
+      var currentActive = document.activeElement;
+      if (!currentActive || !currentActive.classList.contains('actual-input')) {
+        isEditingManualInput = false;
+        safeFocus();
+      }
+    }, 200);
+  }
+});
+
+resBox.addEventListener('input', function(e) {
+  var input = e.target.closest('.actual-input');
+  if (input && currentCode) {
+    var branch = input.getAttribute('data-branch');
+    if (branch) {
+      updateBranchActual(currentCode, branch, input.value, true);
+    }
+  }
+});
+
+resBox.addEventListener('click', function(e) {
+  if (itemsData[currentCode] && getActiveLockWorker(itemsData[currentCode])) return;
+
+  var btn = e.target.closest('.fill-btn');
+  if (btn && currentCode) {
+    e.stopPropagation();
+    var branch = btn.getAttribute('data-branch');
+    if (branch) {
+      var targetQty = (itemsData[currentCode] && itemsData[currentCode].branches && itemsData[currentCode].branches[branch]) ? itemsData[currentCode].branches[branch].target : 0;
+      updateBranchActual(currentCode, branch, targetQty);
+      safeFocus();
+    }
+    return;
+  }
+
+  var tr = e.target.closest('tr[data-branch]');
+  if (tr && currentCode) {
+    if (tr.classList.contains('zero') || e.target.classList.contains('actual-input')) return;
+    var bName = tr.getAttribute('data-branch');
+    if (bName) {
+      activeBranch = bName;
+      renderResult(currentCode, itemsData[currentCode], bName);
+      safeFocus();
+    }
+  }
+});
+
+function renderHistory() {
+  var hBox = document.getElementById('historyBox');
+  var hList = document.getElementById('historyList');
+  if (historyListArr.length === 0) {
+    hBox.style.display = 'none';
+    return;
+  }
+  hBox.style.display = 'block';
+  hList.innerHTML = historyListArr.map(function(h) {
+    return '<div class="history-item"><span class="name">' + escapeHtml(h.name) + '</span><span class="code">' + escapeHtml(h.code) + '</span></div>';
+  }).join('');
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str === undefined || str === null ? '' : String(str);
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
