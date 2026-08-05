@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -29,29 +29,29 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build Web Assets for Capacitor
-        run: |
-          mkdir -p www
-          cp index.html www/
-          cp manifest.json www/ 2>/dev/null || true
-          cp *.png www/ 2>/dev/null || true
+      - name: Accept Android Licenses
+        run: y | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Install Capacitor & Build Android Project
-        run: |
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init BranchPrepWorker com.branchprep.worker --web-dir www
-          npx cap add android
-          npx cap sync android
+      - name: Install Cordova
+        run: npm install -g cordova
 
-      - name: Build APK via Gradle
+      - name: Create Cordova Project & Add Android
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          cordova create myApp com.branchprep.worker BranchPrepWorker
+          cd myApp
+          rm -rf www/*
+          cp -r ../index.html www/
+          cp -r ../manifest.json www/ 2>/dev/null || true
+          cp -r ../*.png www/ 2>/dev/null || true
+          cordova platform add android@12.0.0
+
+      - name: Build Android APK
+        run: |
+          cd myApp
+          cordova build android --debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BranchPrep-Worker-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: myApp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
