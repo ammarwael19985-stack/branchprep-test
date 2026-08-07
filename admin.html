@@ -66,7 +66,6 @@
   .hidden { display: none !important; }
   .empty-state { text-align: center; padding: 40px; color: #888; font-size: 1.1rem; }
 
-  /* تأثير الضغط والاندفاع لجوة لأزرار التصدير فقط */
   .btn-export, .btn-export-small {
     transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.1s ease !important;
     user-select: none;
@@ -238,7 +237,7 @@ function openExistingOrder() {
     localStorage.setItem('bp_admin_code', code);
     showDashboard(code);
   } else {
-    alert('لم يتم العثور على طلبية بهذا الكود! تأكد من الرقم.');
+    alert('لم يتم العثور على طلبية بهذا الكود على السيرفر! تأكد من الرقم أو أعد رفع الملف.');
   }
 }
 
@@ -306,14 +305,16 @@ function processExcelData(rows) {
 
   const orderCode = Math.floor(1000 + Math.random() * 9000).toString();
   
-  allOrdersStore[orderCode] = {
+  const newOrderObj = {};
+  newOrderObj[orderCode] = {
     createdAt: new Date().toISOString(),
     _lastUpdated: Date.now(),
     items: items,
     activeSessions: {}
   };
 
-  socket.emit('update-data', allOrdersStore);
+  // إرسال الطلبية الجديدة فقط للدمج الآمن في السيرفر
+  socket.emit('update-data', newOrderObj);
 
   document.getElementById('status').textContent = '';
   currentActiveCode = orderCode;
@@ -567,7 +568,9 @@ function showDownloadToast(fileName) {
 function resetCurrentOrder() {
   if(confirm('هل تريد الخروج من شاشة متابعة هذه الطلبية؟')) {
     localStorage.removeItem('bp_admin_code');
-    location.reload();
+    currentActiveCode = null;
+    document.getElementById('liveDashboard').classList.add('hidden');
+    document.getElementById('uploadCard').classList.remove('hidden');
   }
 }
 </script>
