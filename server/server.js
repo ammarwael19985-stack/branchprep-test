@@ -20,15 +20,23 @@ let ordersData = {};
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
+  // إرسال البيانات الحالية عند الاتصال
   socket.emit('init-data', ordersData);
 
-  // طلب حجز/قفل صنف لموظف
+  // 1. التحقق من صحة كود الطلبية قبل دخول الموظف
+  socket.on('validate-order', ({ orderCode }, callback) => {
+    const isValid = !!(ordersData && ordersData[orderCode]);
+    if (typeof callback === 'function') {
+      callback({ valid: isValid });
+    }
+  });
+
+  // 2. طلب حجز/قفل صنف لموظف
   socket.on('acquire-lock', ({ orderCode, barcode, workerName, sessionId }) => {
-    if (ordersData[orderCode] && ordersData[orderCode].items[barcode]) {
+    if (ordersData[orderCode] && ordersData[orderCode].items && ordersData[orderCode].items[barcode]) {
       const item = ordersData[orderCode].items[barcode];
       const now = Date.now();
 
-      // إذا لم يكن هناك قفل أو انتهت مدة القفل القديم (15 ثانية)
       if (!item.lock || item.lock.sessionId === sessionId || (now - (item.lock.timestamp || 0) > 15000)) {
         item.lock = { worker: workerName, sessionId, timestamp: now };
         io.emit('lock-changed', { orderCode, barcode, lock: item.lock });
@@ -38,9 +46,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  // تجديد وقت القفل (Keep alive)
+  // تجديد وقت القفل
   socket.on('keep-lock-alive', ({ orderCode, barcode, sessionId }) => {
-    if (ordersData[orderCode] && ordersData[orderCode].items[barcode]) {
+    if (ordersData[orderCode] && ordersData[orderCode].items && ordersData[orderCode].items[barcode]) {
       const item = ordersData[orderCode].items[barcode];
       if (item.lock && item.lock.sessionId === sessionId) {
         item.lock.timestamp = Date.now();
@@ -49,9 +57,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  // فك القفل عند ترك الصنف أو المسح الجديد
+  // فك القفل
   socket.on('release-lock', ({ orderCode, barcode, sessionId }) => {
-    if (ordersData[orderCode] && ordersData[orderCode].items[barcode]) {
+    if (ordersData[orderCode] && ordersData[orderCode].items && ordersData[orderCode].items[barcode]) {
       const item = ordersData[orderCode].items[barcode];
       if (item.lock && item.lock.sessionId === sessionId) {
         delete item.lock;
@@ -62,7 +70,7 @@ io.on('connection', (socket) => {
 
   // تحديث جزئي سريع للأصناف والفروع
   socket.on('update-item', ({ orderCode, barcode, branch, actual, worker }) => {
-    if (ordersData[orderCode] && ordersData[orderCode].items[barcode]) {
+    if (ordersData[orderCode] && ordersData[orderCode].items && ordersData[orderCode].items[barcode]) {
       const item = ordersData[orderCode].items[barcode];
       if (!item.branches) item.branches = {};
       if (!item.branches[branch]) item.branches[branch] = { target: 0, actual: "", worker: "" };
@@ -86,9 +94,21 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 3. تحديث أو إضافة طلبية حماية ضد المسح الشامل
   socket.on('update-data', (data) => {
-    ordersData = data;
-    io.emit('data-changed', ordersData);
+    if (data && typeof data === 'object') {
+      // دمج الطلبيات الجديدة بدلاً من مسح القديم
+      ordersData = { ...ordersData, ...data };
+      io.emit('data-changed', ordersData);
+    }
+  });
+
+  // حذف طلبية واحدة فقط عند إنهاؤها من الأدمن
+  socket.on('delete-order', ({ orderCode }) => {
+    if (ordersData[orderCode]) {
+      delete ordersData[orderCode];
+      io.emit('data-changed', ordersData);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -97,7 +117,7 @@ io.on('connection', (socket) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('BranchPrep Fast Server with Locking is Running Successfully!');
+  res.send('BranchPrep Secured Fast Server is Running Successfully!');
 });
 
 const PORT = process.env.PORT || 3000;
