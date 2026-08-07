@@ -23,6 +23,7 @@
 
   .file-btn { display:inline-block; background:var(--accent); color:#fff; padding:13px 28px; border-radius:10px; font-weight:700; font-size:.95rem; cursor:pointer; border:none; width:100%; }
   .file-btn:active { background:var(--accent-dark); }
+  .file-btn:disabled { opacity:0.6; cursor:not-allowed; }
 
   .status-bar { display:flex; justify-content:space-between; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:16px; font-size:.78rem; color:var(--muted); }
   .status-bar b { color:var(--ink); }
@@ -71,7 +72,7 @@
   .history h3 { font-size:.8rem; color:var(--muted); margin:0 0 10px; font-weight:700; }
   .history-item { display:flex; justify-content:space-between; padding:8px 4px; font-size:.82rem; border-bottom:1px solid var(--line); }
   .history-item span.code { color:var(--muted); direction:ltr; }
-  .error-msg { background:#fbeae5; border:1px solid #e3b6a6; color:var(--warn); padding:12px 14px; border-radius:10px; font-size:.85rem; margin-top:16px; display:none; }
+  .error-msg { background:#fbeae5; border:1px solid #e3b6a6; color:var(--warn); padding:12px 14px; border-radius:10px; font-size:.85rem; margin-top:16px; display:none; font-weight:bold; }
 </style>
 </head>
 <body>
@@ -205,13 +206,24 @@ try {
 var barcodeInput = document.getElementById('barcodeInput');
 barcodeInput.addEventListener('click', function() { this.removeAttribute('inputmode'); });
 
-// تعديل الدخول التلقائي للشاشة فور الفتح
 window.onload = function() {
   try {
     if (workerName && orderCode) {
       document.getElementById('workerNameInput').value = workerName;
       document.getElementById('orderCodeInput').value = orderCode;
-      openScanScreen();
+      
+      // التحقق الفعلي من السيرفر قبل فتح الدخول التلقائي
+      socket.emit('validate-order', { orderCode: orderCode }, function(res) {
+        if (res && res.valid) {
+          openScanScreen();
+        } else {
+          // الطلبية غير موجودة في السيرفر حالياً
+          localStorage.removeItem('bp_worker');
+          localStorage.removeItem('bp_code');
+          workerName = "";
+          orderCode = "";
+        }
+      });
     }
   } catch(e) {}
 };
@@ -220,6 +232,7 @@ function loginToOrder() {
   var wName = document.getElementById('workerNameInput').value.trim();
   var oCode = document.getElementById('orderCodeInput').value.trim();
   var errDiv = document.getElementById('loginError');
+  var loginBtn = document.getElementById('loginBtn');
 
   if (!wName || !oCode) {
     errDiv.style.display = 'block';
@@ -228,15 +241,29 @@ function loginToOrder() {
   }
 
   errDiv.style.display = 'none';
-  workerName = wName;
-  orderCode = oCode;
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'جاري التحقق من الطلبية...';
 
-  try {
-    localStorage.setItem('bp_worker', workerName);
-    localStorage.setItem('bp_code', orderCode);
-  } catch(e){}
+  // التحقق الفوري من السيرفر قبل الدخول
+  socket.emit('validate-order', { orderCode: oCode }, function(res) {
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'دخول للتحضير 🚀';
 
-  openScanScreen();
+    if (res && res.valid) {
+      workerName = wName;
+      orderCode = oCode;
+
+      try {
+        localStorage.setItem('bp_worker', workerName);
+        localStorage.setItem('bp_code', orderCode);
+      } catch(e){}
+
+      openScanScreen();
+    } else {
+      errDiv.style.display = 'block';
+      errDiv.textContent = '⚠️ لا توجد طلبية نشطة بهذا الرقم! تأكد من الرقم أو اطلب من الأدمن رفع الشيت أولاً.';
+    }
+  });
 }
 
 function openScanScreen() {
