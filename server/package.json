@@ -1,14 +1,13 @@
 {
   "name": "branchprep-server",
-  "version": "1.0.0",
-  "description": "BranchPrep Backend Server",
+  "version": "2.0.0",
+  "description": "BranchPrep Backend Server (with MongoDB persistence + server-side lock)",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "scripts": { "start": "node server.js" },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "mongodb": "^6.8.0",
     "socket.io": "^4.7.5"
   }
 }
