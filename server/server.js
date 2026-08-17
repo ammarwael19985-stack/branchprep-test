@@ -28,7 +28,7 @@ const DB_NAME = process.env.MONGO_DB || "branchprep";
 const COLLECTION = "orders";
 // مدة بقاء الطلبية قبل ما تتمسح تلقائيًا (بيانات مؤقتة) — افتراضي 3 أيام من آخر تعديل
 const ORDER_TTL_DAYS = Number(process.env.ORDER_TTL_DAYS || 3);
-const SAVE_INTERVAL_MS = 1500; // بنجمّع التعديلات ونحفظها كل ~1.5 ثانية بدل كل ضغطة
+const SAVE_INTERVAL_MS = 20000; // بنجمّع التعديلات ونحفظها كل ~20 ثانية بدل كل ضغطة
 
 let mongoClient = null;
 let ordersCol = null;
