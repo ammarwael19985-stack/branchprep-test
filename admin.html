@@ -76,6 +76,27 @@
     transform: scale(0.92) translateY(2px) !important;
     box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.25) !important;
   }
+
+  /* ===== خانة البحث بالباركود ===== */
+  .search-box {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: #faf8f2; border: 1px solid #dcd6c9; border-radius: 10px;
+    padding: 10px 14px; margin-top: 14px;
+  }
+  .search-box input {
+    flex: 1 1 220px; min-width: 180px; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font-size: 1rem; font-weight: bold; font-family: inherit; direction: ltr; text-align: center;
+  }
+  .search-box input:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
+  .btn-clear-search {
+    background: #4a5568; color: #fff; border: none; padding: 8px 14px;
+    border-radius: 8px; font-size: 0.82rem; font-weight: bold; cursor: pointer; white-space: nowrap;
+  }
+  .btn-clear-search:hover { background: #2d3748; }
+  .search-note { font-size: 0.82rem; color: var(--muted); font-weight: bold; }
+  .badge-notstarted { background: #eceff1; color: #546e7a; }
+  tr.search-not-started td { background: #fcfcfd; }
 </style>
 </head>
 <body>
@@ -157,6 +178,14 @@
     </div>
 
     <h3 style="margin-top:20px; border-bottom:2px solid var(--primary); padding-bottom:8px;">سجل تفاصيل أصناف الطلبية 📦</h3>
+
+    <div class="search-box">
+      <span style="font-weight:bold; font-size:0.9rem; color:var(--text); white-space:nowrap;">🔍 بحث بالباركود:</span>
+      <input type="text" id="barcodeSearchInput" inputmode="numeric" autocomplete="off" placeholder="اكتب أو امسح الباركود..." />
+      <button type="button" class="btn-clear-search hidden" id="clearSearchBtn" onclick="clearBarcodeSearch()">✕ مسح البحث</button>
+      <span class="search-note" id="searchResultNote"></span>
+    </div>
+
     <table>
       <thead>
         <tr>
@@ -178,6 +207,7 @@ const socket = io(SOCKET_SERVER);
 let allOrdersStore = {};
 let currentActiveCode = localStorage.getItem('bp_admin_code') || null;
 let currentItemsData = null;
+let barcodeSearchTerm = "";
 
 socket.on('connect', () => {
   console.log('Connected to Render Server');
@@ -217,7 +247,35 @@ socket.on('sessions-updated', ({ orderCode, activeSessions }) => {
 
 window.addEventListener('DOMContentLoaded', () => {
   if (currentActiveCode) showDashboard(currentActiveCode);
+
+  // ===== ربط خانة البحث بالباركود =====
+  const searchInput = document.getElementById('barcodeSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      barcodeSearchTerm = this.value.trim();
+      document.getElementById('clearSearchBtn').classList.toggle('hidden', barcodeSearchTerm === "");
+      refreshTableOnly();
+    });
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') e.preventDefault();
+    });
+  }
 });
+
+function clearBarcodeSearch() {
+  const searchInput = document.getElementById('barcodeSearchInput');
+  if (searchInput) searchInput.value = "";
+  barcodeSearchTerm = "";
+  document.getElementById('clearSearchBtn').classList.add('hidden');
+  refreshTableOnly();
+  if (searchInput) searchInput.focus();
+}
+
+function refreshTableOnly() {
+  if (currentActiveCode && allOrdersStore[currentActiveCode]) {
+    updateDashboardUI(allOrdersStore[currentActiveCode]);
+  }
+}
 
 function showDashboard(code) {
   document.getElementById('uploadCard').classList.add('hidden');
@@ -360,6 +418,11 @@ function updateDashboardUI(orderData) {
   let totalActualQty = 0;
   let hasVisibleItems = false;
 
+  // ===== وضع البحث — لو فيه بحث نعرض الصنف حتى لو مبدأش تحضيره =====
+  const searchTerm = barcodeSearchTerm;
+  const isSearching = searchTerm !== "";
+  let searchHitsCount = 0;
+
   renderWorkersOnly(sessions);
 
   Object.keys(items).forEach(barcode => {
@@ -399,25 +462,44 @@ function updateDashboardUI(orderData) {
       }
     }
 
-    if (!itemHasAnyActual && !(item.lock && Date.now() - item.lock.timestamp < 10000)) return;
+    // ===== فلتر العرض =====
+    if (isSearching) {
+      if (String(barcode).indexOf(searchTerm) === -1) return;
+      searchHitsCount++;
+    } else {
+      if (!itemHasAnyActual && !(item.lock && Date.now() - item.lock.timestamp < 10000)) return;
+    }
 
     hasVisibleItems = true;
     const tr = document.createElement('tr');
+    if (isSearching && !itemHasAnyActual) tr.className = 'search-not-started';
+
+    const statusHtml = (isSearching && !itemHasAnyActual)
+      ? `<span class="badge badge-notstarted">لم يبدأ التحضير</span>`
+      : `<span class="badge ${isItemFullyDone ? 'badge-done' : 'badge-pending'}">${isItemFullyDone ? 'مكتمل' : 'قيد التحضير'}</span>`;
+
     tr.innerHTML = `
       <td style="font-family:monospace; font-weight:bold;">${barcode}</td>
       <td style="font-weight:bold;">${item.product || '-'}</td>
       <td>${branchDetailsHtml}</td>
       <td>
-        <span class="badge ${isItemFullyDone ? 'badge-done' : 'badge-pending'}">
-          ${isItemFullyDone ? 'مكتمل' : 'قيد التحضير'}
-        </span>
+        ${statusHtml}
       </td>
     `;
     tbody.appendChild(tr);
   });
 
   if (!hasVisibleItems) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">لم يتم بدء التحضير في أي صنف بعد.<br>بمجرد أن يقوم العامل بمسح صنف، سيظهر هنا فوراً.</td></tr>';
+    tbody.innerHTML = isSearching
+      ? `<tr><td colspan="4" class="empty-state">لا يوجد صنف بهذا الباركود في هذه الطلبية.<br><small>تأكد من الرقم أو اضغط (✕ مسح البحث) للرجوع للعرض العادي.</small></td></tr>`
+      : '<tr><td colspan="4" class="empty-state">لم يتم بدء التحضير في أي صنف بعد.<br>بمجرد أن يقوم العامل بمسح صنف، سيظهر هنا فوراً.</td></tr>';
+  }
+
+  const noteEl = document.getElementById('searchResultNote');
+  if (noteEl) {
+    noteEl.textContent = isSearching
+      ? `نتائج البحث: ${searchHitsCount} صنف من ${totalItemsCount}`
+      : '';
   }
 
   const startedPercent = totalItemsCount > 0 ? Math.round((startedItemsCount / totalItemsCount) * 100) : 0;
